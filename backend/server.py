@@ -259,7 +259,7 @@ def _round(n):
 
 def _split(channels, dollars):
     c = len(channels)
-    base = _round((dollars // c) if False else round(dollars / c, 2))
+    base = round(dollars / c, 2)
     alloc = {}
     running = 0.0
     for i, ch in enumerate(channels):
@@ -381,7 +381,7 @@ def build_reports_history(num_weeks=5):
 
 
 # In-memory report store (seeded); reconcile appends the next learned week.
-REPORTS: List[dict] = build_reports_history(5)
+REPORTS: List[dict] = build_reports_history(3)
 
 
 # ===========================================================================
@@ -590,7 +590,7 @@ async def adsmith_reconcile():
 @api.post("/adsmith/reset")
 async def adsmith_reset():
     global REPORTS
-    REPORTS = build_reports_history(5)
+    REPORTS = build_reports_history(3)
     return {"ok": True, "weeks": len(REPORTS)}
 
 
