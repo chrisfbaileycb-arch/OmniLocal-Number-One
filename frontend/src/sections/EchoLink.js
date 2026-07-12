@@ -8,26 +8,33 @@ import { SectionTitle, Overline } from "@/components/ui-bits";
 const segColor = { vip: "#27AE60", standard: "#5C5A56", promo_pool: "#F39C12" };
 const segLabel = { vip: "VIP", standard: "Standard", promo_pool: "Promo Pool" };
 
+const GUEST_OPTIONS = [
+  { key: "new", seg: "new", isNew: true, label: "New Guest", hint: "80% win big — entice them in" },
+  { key: "vip", seg: "vip", isNew: false, label: "Quality Regular", hint: "High reward — reward loyalty" },
+  { key: "promo_pool", seg: "promo_pool", isNew: false, label: "Couponer", hint: "Small reward — protect margin" },
+];
+
 export default function EchoLink() {
   const [segments, setSegments] = useState(null);
   const [drip, setDrip] = useState(null);
   const [result, setResult] = useState(null);
   const [spinning, setSpinning] = useState(false);
+  const [guest, setGuest] = useState(GUEST_OPTIONS[0]);
 
   useEffect(() => {
     getSegments().then(setSegments).catch(() => {});
     getDrip().then(setDrip).catch(() => {});
   }, []);
 
-  const doSpin = async (isNew) => {
+  const doSpin = async () => {
     setSpinning(true);
     setResult(null);
     setTimeout(async () => {
-      const res = await spin(isNew);
+      const res = await spin(guest.isNew, guest.seg);
       setResult(res);
       setSpinning(false);
       toast[res.tier === "highValue" ? "success" : "message"](
-        `${res.guestType === "new" ? "New" : "Repeat"} guest won: ${res.reward}`,
+        `${guest.label} won: ${res.reward}`,
         { description: `Coupon ${res.couponCode} auto-applies at checkout` }
       );
     }, 700);
@@ -47,7 +54,7 @@ export default function EchoLink() {
           <div className="flex items-center gap-2"><QrCode size={18} color="var(--primary)" /><Overline>Scan-to-Spin</Overline></div>
           <h3 className="serif text-2xl mt-1">Gamified guest acquisition</h3>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            New guests win big 80% of the time (unforgettable first impression). Repeat guests get the standard reward 90% of the time (sustainable CAC).
+            Rewards are segment-aware: new & quality guests win the big reward to entice them in — couponers get something small to protect your margin.
           </p>
 
           <div className="grid place-items-center my-6">
@@ -60,12 +67,21 @@ export default function EchoLink() {
             </motion.div>
           </div>
 
-          <div className="flex gap-3 justify-center">
-            <button className="btn btn-primary" onClick={() => doSpin(true)} disabled={spinning} data-testid="spin-new-btn">
-              Spin as New Guest
-            </button>
-            <button className="btn btn-ghost" onClick={() => doSpin(false)} disabled={spinning} data-testid="spin-repeat-btn">
-              Spin as Repeat Guest
+          <div className="flex flex-col gap-2 mb-4">
+            {GUEST_OPTIONS.map((g) => (
+              <button key={g.key} onClick={() => { setGuest(g); setResult(null); }} data-testid={`guest-${g.key}`}
+                className="text-left px-3 py-2 rounded-lg"
+                style={{ border: guest.key === g.key ? "2px solid var(--primary)" : "1px solid var(--border)",
+                         background: guest.key === g.key ? "var(--surface-alt)" : "transparent" }}>
+                <div className="text-sm font-bold">{g.label}</div>
+                <div className="text-xs" style={{ color: "var(--text-secondary)" }}>{g.hint}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex justify-center">
+            <button className="btn btn-primary" onClick={doSpin} disabled={spinning} data-testid="spin-btn">
+              {spinning ? "Spinning…" : `Spin the Wheel · ${guest.label}`}
             </button>
           </div>
 
@@ -150,6 +166,29 @@ export default function EchoLink() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* POS Verification — the proof it worked */}
+      <div className="card p-6 md:p-8 mt-8" data-testid="verification">
+        <Overline>POS Verification · from CSV / ordering platform</Overline>
+        <h3 className="serif text-2xl mt-1">The proof it worked — and who's worth chasing</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div><Overline>Codes Issued</Overline><div className="mono text-2xl">{segments.verification.codesIssued}</div></div>
+          <div><Overline>Codes Redeemed</Overline><div className="mono text-2xl" style={{ color: "var(--primary)" }}>{segments.verification.codesRedeemed}</div></div>
+          <div><Overline>Redemption Rate</Overline><div className="mono text-2xl">{(segments.verification.redemptionRate * 100).toFixed(0)}%</div></div>
+          <div><Overline>Revenue Proven</Overline><div className="mono text-2xl" style={{ color: "var(--success)" }}>${segments.verification.revenueFromRedemptions.toLocaleString()}</div></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <div className="p-3 rounded-lg" style={{ border: "1px solid var(--border)" }}>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>Margin-eroding couponers</div>
+            <div className="mono text-xl" style={{ color: "#F39C12" }}>{segments.verification.couponers}</div>
+          </div>
+          <div className="p-3 rounded-lg" style={{ border: "1px solid var(--border)" }}>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>High-value regulars</div>
+            <div className="mono text-xl" style={{ color: "var(--success)" }}>{segments.verification.qualityCustomers}</div>
+          </div>
+        </div>
+        <p className="text-sm mt-4" style={{ color: "var(--text-secondary)" }}>{segments.verification.note}</p>
       </div>
     </div>
   );

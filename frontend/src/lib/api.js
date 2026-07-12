@@ -16,5 +16,5 @@ export const reconcile = () => client.post("/adsmith/reconcile").then((r) => r.d
 export const resetLoop = () => client.post("/adsmith/reset").then((r) => r.data);
 export const getSegments = () => client.get("/echolink/segments").then((r) => r.data);
 export const getDrip = () => client.get("/echolink/drip").then((r) => r.data);
-export const spin = (isNewGuest) =>
-  client.post("/echolink/spin", { isNewGuest }).then((r) => r.data);
+export const spin = (isNewGuest, segment = "new") =>
+  client.post("/echolink/spin", { isNewGuest, segment }).then((r) => r.data);
