@@ -1,0 +1,150 @@
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { Clapperboard, Sparkles, Video } from "lucide-react";
+import { getPrompts, postCopy, postCritic } from "@/lib/api";
+import { SectionTitle, Overline, GradeBadge } from "@/components/ui-bits";
+
+const VAULT_IMAGES = {
+  "Signature Prep": "https://images.unsplash.com/photo-1765735049473-7cb6466e5b3f?crop=entropy&cs=srgb&fm=jpg&w=600&q=70",
+  "Operational Hustle": "https://images.unsplash.com/photo-1772550867139-f1d8bbc555a5?crop=entropy&cs=srgb&fm=jpg&w=600&q=70",
+  "Community": "https://images.unsplash.com/photo-1771813156445-1d70dc259856?crop=entropy&cs=srgb&fm=jpg&w=600&q=70",
+  "Hero Product": "https://images.unsplash.com/photo-1669109230787-71bdd4699af4?crop=entropy&cs=srgb&fm=jpg&w=600&q=70",
+  "Evergreen / Holidays": "https://images.unsplash.com/photo-1776941659512-2c883d0719c5?crop=entropy&cs=srgb&fm=jpg&w=600&q=70",
+};
+
+function Draft({ platform, text }) {
+  return (
+    <div className="card p-4" data-testid={`draft-${platform}`}>
+      <Overline style={{ color: "var(--primary)" }}>{platform}</Overline>
+      <p className="text-sm mt-2 whitespace-pre-wrap" style={{ color: "var(--text)" }}>{text}</p>
+    </div>
+  );
+}
+
+function CategoryScore({ label, score }) {
+  return (
+    <div className="py-4 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex items-center gap-3">
+        <span className="serif text-xl" style={{ minWidth: 90 }}>{label}</span>
+        <GradeBadge grade={score.grade} />
+      </div>
+      <p className="text-sm mt-2" style={{ color: "var(--text)" }}><b>Critique:</b> {score.critique}</p>
+      <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}><b>Fix:</b> {score.recommendation}</p>
+    </div>
+  );
+}
+
+export default function ContentDirector() {
+  const [data, setData] = useState(null);
+  const [transcript, setTranscript] = useState(
+    "Um, so today we're, we're making the the Sunday Gravy Sub, you know, and the secret is the sauce simmers for like six hours, I mean, it's my grandmother's recipe from Naples."
+  );
+  const [drafts, setDrafts] = useState(null);
+  const [report, setReport] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { getPrompts().then(setData).catch(() => {}); }, []);
+
+  const generate = async () => {
+    setBusy(true);
+    try {
+      const res = await postCopy(transcript);
+      setDrafts(res.drafts);
+      toast.success("Cleaned your words into 3 platform-ready posts");
+    } finally { setBusy(false); }
+  };
+
+  const grade = async (index, label) => {
+    const res = await postCritic(index);
+    setReport(res.report);
+    toast(`Graded: ${label}`, { description: `Overall: ${res.report.overall}` });
+  };
+
+  if (!data) return <div className="p-10" style={{ color: "var(--text-secondary)" }}>Loading…</div>;
+
+  return (
+    <div className="p-6 md:p-12 max-w-[1200px]">
+      <SectionTitle kicker="Module 01 · Content Director"
+        title="Film your restaurant once. Turn it into weeks of content."
+        subtitle="The cook slinging a sub during the dinner rush beats any polished ad. We capture that authenticity, then multiply it — and tell you the honest truth about what to fix." />
+
+      {/* Today's prompt */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          className="card p-6 lg:col-span-1" style={{ background: "var(--surface-alt)" }} data-testid="prompt-today">
+          <Overline style={{ color: "var(--primary)" }}>Today's Shooting Prompt</Overline>
+          <h3 className="serif text-2xl mt-2">{data.today.title}</h3>
+          <p className="text-sm mt-2" style={{ color: "var(--text)" }}>{data.today.prompt}</p>
+          <p className="text-xs mt-3 italic" style={{ color: "var(--text-secondary)" }}>{data.today.guidance}</p>
+        </motion.div>
+
+        {/* Asset vault */}
+        <div className="lg:col-span-2">
+          <Overline>Brand Asset Vault · filmed once, reused forever</Overline>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+            {data.assetVault.map((a, i) => (
+              <motion.div key={a.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }} className="card lift overflow-hidden" data-testid={`vault-${a.id}`}>
+                <div className="h-24 bg-cover bg-center" style={{ backgroundImage: `url(${VAULT_IMAGES[a.category] || VAULT_IMAGES["Community"]})` }} />
+                <div className="p-3">
+                  <div className="text-sm font-semibold leading-tight">{a.title}</div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{a.category} · {a.clips} clips</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Speech to copy */}
+      <div className="card p-6 md:p-8 mt-8">
+        <div className="flex items-center gap-2"><Sparkles size={18} color="var(--primary)" /><Overline>Speech → Copy</Overline></div>
+        <h3 className="serif text-2xl mt-1">Talk. We write the posts.</h3>
+        <textarea data-testid="transcript-input" value={transcript} onChange={(e) => setTranscript(e.target.value)}
+          rows={4} className="w-full mt-3 p-3 rounded-lg text-sm" style={{ border: "1px solid var(--border)", background: "var(--bg)" }} />
+        <button className="btn btn-primary mt-3" onClick={generate} disabled={busy} data-testid="generate-copy-btn">
+          {busy ? "Writing…" : "Generate 3 Posts"}
+        </button>
+        {drafts && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+            <Draft platform="Google Business" text={drafts.gbp} />
+            <Draft platform="Facebook" text={drafts.facebook} />
+            <Draft platform="Instagram" text={drafts.instagram} />
+          </div>
+        )}
+      </div>
+
+      {/* Brutal Honesty Critic */}
+      <div className="card p-6 md:p-8 mt-8">
+        <div className="flex items-center gap-2"><Video size={18} color="var(--danger)" /><Overline>The Brutal Honesty Video Critic</Overline></div>
+        <h3 className="serif text-2xl mt-1">We'll tell you if it sucks — and exactly how to fix it.</h3>
+        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+          No competitor tells a paying customer the truth. We do — because we optimize for your money, not your comfort.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          {data.sampleVideos.map((v) => (
+            <button key={v.index} className="btn btn-ghost text-sm" onClick={() => grade(v.index, v.label)}
+              data-testid={`grade-video-${v.index}`}>
+              <Clapperboard size={14} className="inline mr-1" /> {v.label}
+            </button>
+          ))}
+        </div>
+        {report && (
+          <motion.div key={report.filename} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="mt-5 p-5 rounded-lg" style={{ background: "var(--surface-alt)" }} data-testid="critic-report">
+            <div className="flex items-center justify-between">
+              <span className="mono text-sm">{report.filename}</span>
+              <div className="flex items-center gap-2"><span className="overline">Overall</span><GradeBadge grade={report.overall} size="lg" /></div>
+            </div>
+            <div className="mt-2">
+              <CategoryScore label="Hook" score={report.hook} />
+              <CategoryScore label="Audio" score={report.audio} />
+              <CategoryScore label="Framing" score={report.framing} />
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
