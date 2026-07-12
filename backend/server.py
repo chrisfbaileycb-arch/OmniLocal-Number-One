@@ -381,7 +381,8 @@ def build_reports_history(num_weeks=5):
 
 
 # In-memory report store (seeded); reconcile appends the next learned week.
-REPORTS: List[dict] = build_reports_history(3)
+INITIAL_WEEKS = 3
+REPORTS: List[dict] = build_reports_history(INITIAL_WEEKS)
 
 
 # ===========================================================================
@@ -571,7 +572,7 @@ async def adsmith_reconcile():
     else:
         share_a = prev_share_a
     w = len(REPORTS)
-    week_of = _monday(w - 4)  # seeded weeks end at offset 0; next is +1, +2, ...
+    week_of = _monday(w - (INITIAL_WEEKS - 1))  # seeded weeks end at offset 0; next is +1, +2, ...
     txs, spend_a, spend_b = _seed_week_txs(w, share_a)
     alloc = build_allocation(week_of, share_a)
     ma = _metrics(txs, "STRATA", alloc["strategyA"]["dollars"])
