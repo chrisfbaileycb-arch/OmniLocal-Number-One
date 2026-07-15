@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import "@/App.css";
 import { Toaster } from "sonner";
-import { LayoutDashboard, Clapperboard, TrendingUp, Sparkles, UtensilsCrossed } from "lucide-react";
+import { LayoutDashboard, Clapperboard, TrendingUp, Sparkles, UtensilsCrossed, KeyRound, Plug } from "lucide-react";
 import Overview from "@/sections/Overview";
 import ContentDirector from "@/sections/ContentDirector";
 import AdSmith from "@/sections/AdSmith";
 import EchoLink from "@/sections/EchoLink";
+import Codes from "@/sections/Codes";
+import Connections from "@/sections/Connections";
 import { getOverview } from "@/lib/api";
 
 const NAV = [
@@ -13,6 +15,8 @@ const NAV = [
   { id: "content", label: "Content Director", icon: Clapperboard },
   { id: "adsmith", label: "AdSmith", icon: TrendingUp },
   { id: "echolink", label: "EchoLink", icon: Sparkles },
+  { id: "codes", label: "Codes & Redemption", icon: KeyRound },
+  { id: "connections", label: "Connections", icon: Plug },
 ];
 
 function App() {
@@ -95,6 +99,8 @@ function App() {
             {active === "content" && <ContentDirector />}
             {active === "adsmith" && <AdSmith />}
             {active === "echolink" && <EchoLink />}
+            {active === "codes" && <Codes />}
+            {active === "connections" && <Connections />}
           </div>
         </main>
       </div>

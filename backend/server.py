@@ -621,6 +621,207 @@ async def echolink_drip():
     return drip_schedule()
 
 
+# ===========================================================================
+# CONNECTIONS — platform toggles that gate AdSmith
+# ===========================================================================
+PLATFORMS = [
+    {"id": "facebook", "label": "Facebook", "default": True},
+    {"id": "instagram", "label": "Instagram / Reels", "default": True},
+    {"id": "google", "label": "Google Business & Maps", "default": True},
+    {"id": "tiktok", "label": "TikTok", "default": False},
+    {"id": "youtube", "label": "YouTube", "default": False},
+]
+CONNECTIONS: Dict[str, bool] = {p["id"]: p["default"] for p in PLATFORMS}
+
+# Potential paid/organic channels per strategy, each tied to a platform.
+CHANNEL_PLATFORM = {
+    "facebook_act_now_ads": "facebook", "google_maps_pin_boost": "google",
+    "tiktok_spark_ads": "tiktok", "gbp_organic_boost": "google",
+    "local_story_drip": "instagram", "youtube_shorts": "youtube",
+}
+CHANNEL_LABELS.update({"tiktok_spark_ads": "TikTok Spark Ads", "youtube_shorts": "YouTube Shorts"})
+STRATEGY_POTENTIAL = {
+    "A": {"displayName": "Paid Local Velocity",
+          "channels": ["facebook_act_now_ads", "google_maps_pin_boost", "tiktok_spark_ads"]},
+    "B": {"displayName": "Organic Community Outreach",
+          "channels": ["gbp_organic_boost", "local_story_drip", "youtube_shorts"]},
+}
+
+
+def recommended_plan(total=WEEKLY_BUDGET):
+    share_a = REPORTS[-1]["allocation"]["strategyA"]["share"]
+    conn = {ch: CONNECTIONS.get(CHANNEL_PLATFORM[ch], False) for ch in CHANNEL_PLATFORM}
+    cA = [c for c in STRATEGY_POTENTIAL["A"]["channels"] if conn[c]]
+    cB = [c for c in STRATEGY_POTENTIAL["B"]["channels"] if conn[c]]
+    exA = [c for c in STRATEGY_POTENTIAL["A"]["channels"] if not conn[c]]
+    exB = [c for c in STRATEGY_POTENTIAL["B"]["channels"] if not conn[c]]
+    if cA and cB:
+        sa = share_a
+    elif cA:
+        sa = 1.0
+    elif cB:
+        sa = 0.0
+    else:
+        sa = 0.0
+
+    def strat(chs, dollars):
+        return {"dollars": _round(dollars), "perChannel": _split(chs, dollars) if chs else {}}
+    dollars_a = _round(sa * total)
+    dollars_b = _round(total - dollars_a)
+    connected_count = sum(1 for v in CONNECTIONS.values() if v)
+    return {
+        "totalBudget": total, "connectedCount": connected_count,
+        "strategyA": {"displayName": STRATEGY_POTENTIAL["A"]["displayName"], "share": _round(sa),
+                      **strat(cA, dollars_a), "excludedChannels": [{"channel": c, "label": CHANNEL_LABELS[c],
+                       "platform": CHANNEL_PLATFORM[c]} for c in exA]},
+        "strategyB": {"displayName": STRATEGY_POTENTIAL["B"]["displayName"], "share": _round(1 - sa),
+                      **strat(cB, dollars_b), "excludedChannels": [{"channel": c, "label": CHANNEL_LABELS[c],
+                       "platform": CHANNEL_PLATFORM[c]} for c in exB]},
+        "warning": None if (cA or cB) else "No platforms connected — connect at least one to run campaigns.",
+        "diversificationTip": ("Connect 3–4 platforms for the widest reach — people are creatures of habit and "
+                               "live on one channel ~80% of the time.") if connected_count < 3 else None,
+    }
+
+
+# ===========================================================================
+# CODE SYSTEM — weekly probability-weighted redemption batches + reconciliation
+# ===========================================================================
+CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+REWARD_POOL = [
+    {"tier": "grand", "reward": "Free Sub (BOGO)", "weight": 8, "variants": 3},
+    {"tier": "high", "reward": "30% Off", "weight": 17, "variants": 4},
+    {"tier": "mid", "reward": "20% Off", "weight": 30, "variants": 4},
+    {"tier": "low", "reward": "Free Fountain Drink", "weight": 45, "variants": 3},
+]
+
+
+def _gen_code(length, rng):
+    return "".join(rng.choice(CODE_ALPHABET) for _ in range(length))
+
+
+def generate_batch(length=8, week_of=None):
+    if length not in (4, 8, 10, 11):
+        length = 8
+    week_of = week_of or _monday(0)
+    rng = random.Random()
+    tiers, all_codes = [], {}
+    total_weight = sum(t["weight"] for t in REWARD_POOL)
+    for t in REWARD_POOL:
+        codes = []
+        while len(codes) < t["variants"]:
+            c = _gen_code(length, rng)
+            if c not in all_codes:
+                codes.append(c)
+                all_codes[c] = {"tier": t["tier"], "reward": t["reward"]}
+        tiers.append({"tier": t["tier"], "reward": t["reward"],
+                      "probability": _round(t["weight"] / total_weight), "codes": codes})
+    expires = (datetime.strptime(week_of, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
+    return {"weekOf": week_of, "length": length, "issuedAt": week_of, "expiresAt": expires,
+            "tiers": tiers, "allCodes": all_codes, "totalCodes": len(all_codes)}
+
+
+CURRENT_BATCH = generate_batch(8)
+
+
+def _sample_csv(batch):
+    rng = random.Random(7)
+    codes = list(batch["allCodes"].keys())
+    picked = rng.sample(codes, max(1, int(len(codes) * 0.6)))
+    lines = ["promo_code,net_sales"]
+    for c in picked:
+        lines.append(f"{c},{_round(rng.uniform(12, 44))}")
+    # a couple of invalid / never-issued codes
+    lines.append(f"{_gen_code(batch['length'], rng)},22.00")
+    lines.append(f"{_gen_code(batch['length'], rng)},18.50")
+    return "\n".join(lines)
+
+
+def reconcile_csv(csv_text, batch):
+    issued = batch["allCodes"]
+    redeemed, invalid, revenue = 0, 0, 0.0
+    by_tier = {}
+    rows = []
+    for i, line in enumerate(csv_text.strip().splitlines()):
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 2:
+            continue
+        code, amt_s = parts[0], parts[1]
+        if i == 0 and not amt_s.replace(".", "").isdigit():
+            continue  # header
+        try:
+            amt = float(amt_s)
+        except ValueError:
+            continue
+        if code in issued:
+            redeemed += 1
+            revenue = _round(revenue + amt)
+            tier = issued[code]["tier"]
+            by_tier[tier] = by_tier.get(tier, 0) + 1
+            rows.append({"code": code, "net_sales": _round(amt), "reward": issued[code]["reward"], "valid": True})
+        else:
+            invalid += 1
+            rows.append({"code": code, "net_sales": _round(amt), "reward": "—", "valid": False})
+    total_issued = len(issued)
+    return {"issued": total_issued, "redeemed": redeemed, "invalid": invalid,
+            "redemptionRate": _round(redeemed / total_issued) if total_issued else 0,
+            "revenue": revenue, "byTier": by_tier, "rows": rows}
+
+
+class CodeGenReq(BaseModel):
+    length: int = 8
+
+
+class ReconcileReq(BaseModel):
+    csv: str
+
+
+class ConnReq(BaseModel):
+    platform: str
+    connected: bool
+
+
+@api.get("/connections")
+async def get_connections():
+    return {"platforms": [{**p, "connected": CONNECTIONS[p["id"]]} for p in PLATFORMS],
+            "connectedCount": sum(1 for v in CONNECTIONS.values() if v)}
+
+
+@api.put("/connections")
+async def set_connection(req: ConnReq):
+    if req.platform in CONNECTIONS:
+        CONNECTIONS[req.platform] = req.connected
+    return {"platforms": [{**p, "connected": CONNECTIONS[p["id"]]} for p in PLATFORMS],
+            "connectedCount": sum(1 for v in CONNECTIONS.values() if v)}
+
+
+@api.get("/adsmith/recommended-plan")
+async def get_recommended_plan():
+    return recommended_plan()
+
+
+@api.get("/codes/current")
+async def codes_current():
+    b = {k: v for k, v in CURRENT_BATCH.items() if k != "allCodes"}
+    return b
+
+
+@api.post("/codes/generate")
+async def codes_generate(req: CodeGenReq):
+    global CURRENT_BATCH
+    CURRENT_BATCH = generate_batch(req.length)
+    return {k: v for k, v in CURRENT_BATCH.items() if k != "allCodes"}
+
+
+@api.get("/codes/sample-csv")
+async def codes_sample_csv():
+    return {"csv": _sample_csv(CURRENT_BATCH)}
+
+
+@api.post("/codes/reconcile")
+async def codes_reconcile(req: ReconcileReq):
+    return reconcile_csv(req.csv, CURRENT_BATCH)
+
+
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware, allow_credentials=True,

@@ -31,9 +31,11 @@ Google auth, n8n/Whisper transcription, real ad-platform posting/feeds, POS/plat
 ordering-platform redirects. All realistic seeded data for a clickable demo.
 
 ## Implemented (2026-06/07)
-- Full 4-section dashboard: Command Center, Content Director, AdSmith, EchoLink.
-- Interactive: generate copy, grade sample videos, run-next-week loop, segment-aware spin.
-- Verified: all sections render; backend endpoints return correct data.
+- Full 6-section dashboard: Command Center, Content Director, AdSmith, EchoLink, Codes & Redemption, Connections.
+- Interactive: generate copy, grade sample videos, run-next-week loop (seeded 3 weeks → visible shift), segment-aware spin.
+- Weekly Code System (Codes): configurable length (4/8/10/11) for any POS, probability-weighted reward tiers, multiple interchangeable variant codes per tier, weekly expiry/rotation, CSV reconciliation (flags invalid/expired, computes redemption rate + proven revenue). POS-agnostic, no API needed.
+- Platform Connection Toggles (Connections): per-platform on/off; AdSmith "Recommended Plan" GATED to connected channels only (unconnected struck-through). Diversification nudge + pre-Zoom setup guide.
+- Verified: all sections render; endpoints + interactive flows confirmed via curl + screenshots.
 
 ## Business model (captured from user)
 - $299/mo single unified package. Premium = feature.
@@ -43,7 +45,7 @@ ordering-platform redirects. All realistic seeded data for a clickable demo.
 ## Backlog / Next Action Items
 - P1: Onboarding "asset vault capture" flow (film restaurant + evergreen pre-records) as the front door.
 - P1: Two-lane orchestration (organic free vs paid targeted) with executable buttons + 2–3 week planner.
-- P1: Platform click + button-conversion feed model (CSV as fallback, not front door).
-- P2: Real integrations — Google auth, Meta/TikTok/Google Ads APIs, POS/ordering conversion tracking.
-- P2: Persist to MongoDB; multi-restaurant (deployment-per-restaurant per ADR-001).
+- P2: Real integrations — transcription (Whisper, available now) → OAuth into Meta/Google/TikTok (read+post) → Marketing APIs (automated spend).
+- P2: Persist connections/codes/reports to MongoDB; multi-restaurant (deployment-per-restaurant per ADR-001).
+- P2: Wire code-reconciliation results into AdSmith's live learning loop (currently seeded).
 - P2: Tiered pricing ladder (content-only entry → full loop pro tier w/ EchoLink gating).

@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Trophy, Play, RotateCcw, MapPin } from "lucide-react";
-import { getReports, reconcile, resetLoop } from "@/lib/api";
+import { Trophy, Play, RotateCcw, MapPin, Plug } from "lucide-react";
+import { getReports, reconcile, resetLoop, getRecommendedPlan } from "@/lib/api";
 import { SectionTitle, Overline, usd } from "@/components/ui-bits";
 
 function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
@@ -53,9 +53,13 @@ function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
 
 export default function AdSmith() {
   const [data, setData] = useState(null);
+  const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const load = () => getReports().then(setData).catch(() => {});
+  const load = () => {
+    getReports().then(setData).catch(() => {});
+    getRecommendedPlan().then(setPlan).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
 
   const runWeek = async () => {
@@ -109,6 +113,52 @@ export default function AdSmith() {
         <StrategyCard strat={data.strategies.B} alloc={latest.allocation.strategyB}
           metrics={latest.metrics.strategyB} labels={data.channelLabels} isWinner={winner === "B"} />
       </div>
+
+      {/* Connection-aware recommended plan */}
+      {plan && (
+        <div className="card p-6 md:p-8 mt-8" data-testid="recommended-plan">
+          <div className="flex items-center gap-2"><Plug size={18} color="var(--primary)" /><Overline>This Week's Recommended Plan · gated by your connected platforms</Overline></div>
+          <h3 className="serif text-2xl mt-1">It only spends where you're actually present</h3>
+          {plan.warning && (
+            <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "#fdece9", color: "#C0392B" }}>{plan.warning}</div>
+          )}
+          {plan.diversificationTip && (
+            <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "var(--surface-alt)", color: "var(--text-secondary)" }} data-testid="diversification-tip">
+              💡 {plan.diversificationTip}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {[plan.strategyA, plan.strategyB].map((s, i) => (
+              <div key={i} className="p-4 rounded-lg" style={{ border: "1px solid var(--border)" }} data-testid={`plan-strategy-${i === 0 ? "A" : "B"}`}>
+                <div className="flex justify-between items-baseline">
+                  <span className="font-bold">{s.displayName}</span>
+                  <span className="mono" style={{ color: "var(--primary)", fontWeight: 700 }}>{usd(s.dollars)}</span>
+                </div>
+                <div className="mt-3 space-y-1.5">
+                  {Object.entries(s.perChannel).map(([ch, amt]) => (
+                    <div key={ch} className="flex justify-between text-sm">
+                      <span style={{ color: "var(--text-secondary)" }}>{data.channelLabels[ch] || ch}</span>
+                      <span className="mono">{usd(amt)}</span>
+                    </div>
+                  ))}
+                  {Object.keys(s.perChannel).length === 0 && (
+                    <div className="text-sm" style={{ color: "var(--text-secondary)" }}>No connected channels.</div>
+                  )}
+                  {s.excludedChannels.map((c) => (
+                    <div key={c.channel} className="flex justify-between text-sm" style={{ opacity: 0.5 }} data-testid={`excluded-${c.platform}`}>
+                      <span style={{ textDecoration: "line-through" }}>{c.label}</span>
+                      <span className="text-xs">not connected</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs mt-3" style={{ color: "var(--text-secondary)" }}>
+            Toggle platforms in <b>Connections</b> — struck-through channels are ones AdSmith won't recommend until you connect them.
+          </p>
+        </div>
+      )}
 
       {/* Learning chart */}
       <div className="card p-6 md:p-8 mt-8">
