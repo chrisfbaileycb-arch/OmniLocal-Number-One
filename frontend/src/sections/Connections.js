@@ -30,7 +30,7 @@ export default function Connections() {
       setData(res);
       toast[connected ? "success" : "message"](
         `${platform} ${connected ? "connected" : "disconnected"}`,
-        { description: connected ? "AdSmith can now allocate budget here." : "AdSmith will stop recommending this channel." }
+        { description: connected ? "the Ad Engine can now allocate budget here." : "the Ad Engine will stop recommending this channel." }
       );
     } finally { setBusy(null); }
   };
@@ -41,8 +41,8 @@ export default function Connections() {
   return (
     <div className="p-6 md:p-12 max-w-[1200px]">
       <SectionTitle kicker="Onboarding · Connections"
-        title="Connect your platforms — AdSmith only spends where you're present"
-        subtitle="Toggle on the channels you actually have. AdSmith will never recommend a platform you're not connected to. Connect 3–4 for the widest reach." />
+        title="Connect your platforms — the Ad Engine only spends where you're present"
+        subtitle="Toggle on the channels you actually have. the Ad Engine will never recommend a platform you're not connected to. Connect 3–4 for the widest reach." />
 
       <div className="card p-5 mb-6 flex items-start gap-3" style={{ background: "var(--surface-alt)" }} data-testid="diversification-banner">
         <Info size={18} color="var(--primary)" className="mt-0.5" />
@@ -50,8 +50,8 @@ export default function Connections() {
           <div className="font-bold text-sm">You have {count} platform{count === 1 ? "" : "s"} connected.</div>
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
             {count < 3
-              ? "People are creatures of habit — ~80% live on a single platform. Connecting 3–4 lets AdSmith reach audiences you'd otherwise miss. It still works with one, but more diversity = wider, more effective outreach."
-              : "Great — enough diversity for AdSmith to spread spend across habit-locked audiences for maximum reach."}
+              ? "People are creatures of habit — ~80% live on a single platform. Connecting 3–4 lets the Ad Engine reach audiences you'd otherwise miss. It still works with one, but more diversity = wider, more effective outreach."
+              : "Great — enough diversity for the Ad Engine to spread spend across habit-locked audiences for maximum reach."}
           </div>
         </div>
       </div>

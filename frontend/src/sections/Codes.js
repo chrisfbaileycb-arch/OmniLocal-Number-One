@@ -44,7 +44,7 @@ export default function Codes() {
 
   return (
     <div className="p-6 md:p-12 max-w-[1200px]">
-      <SectionTitle kicker="EchoLink · Codes & Redemption"
+      <SectionTitle kicker="OmniLocal #1 · Codes & Redemption"
         title="Weekly codes any POS can use — provable, fraud-resistant"
         subtitle="You generate the codes; the owner bulk-loads weeks of them into their POS once. Fresh set each week means a saved code dies in days — the only way to abuse it is to eat here 4× in a week. Reconcile from a plain CSV export — no POS API required." />
 
@@ -101,7 +101,7 @@ export default function Codes() {
         <h3 className="serif text-2xl mt-1">Upload the POS export — we match, verify, and attribute</h3>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
           Paste a <span className="mono">promo_code,net_sales</span> export. Redeemed codes are matched to this week's batch;
-          anything not issued (or expired) is flagged invalid. The result feeds AdSmith's learning loop.
+          anything not issued (or expired) is flagged invalid. The result feeds the Ad Engine's learning loop.
         </p>
 
         <textarea data-testid="csv-input" value={csv} onChange={(e) => setCsv(e.target.value)} rows={5}

@@ -1,10 +1,10 @@
 """
-Expo Proxy — Unified Restaurant Revenue Engine (demo backend).
+OmniLocal #1 — Unified Restaurant Revenue Engine (demo backend).
 
 Faithfully ports the deterministic engines from the three source repos:
   - Content Director : shooting prompts, transcript->copy, Brutal Honesty Critic
-  - AdSmith          : closed-loop weekly budget allocation + A/B learning
-  - EchoLink         : Scan-to-Spin odds, RFMD VIP segmenting, slow-trickle drip
+  - Quality Content Executioner : closed-loop weekly budget allocation + A/B learning
+  - Quality Customer Maximizer   : rotating games, RFMD VIP segmenting, slow-trickle drip
 
 External systems (Google auth, n8n/Whisper transcription, real ad posting,
 POS/platform feeds) are MOCKED with realistic seeded data so the full loop is
@@ -26,11 +26,11 @@ from datetime import datetime, timezone, timedelta
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-app = FastAPI(title="Expo Proxy Revenue Engine")
+app = FastAPI(title="OmniLocal #1 Revenue Engine")
 api = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("expo-proxy")
+logger = logging.getLogger("omnilocal")
 
 # ---------------------------------------------------------------------------
 # Demo restaurant brand
@@ -240,7 +240,7 @@ ASSET_VAULT = [
 ]
 
 # ===========================================================================
-# ADSMITH — strategies + closed-loop budget engine
+# QUALITY CONTENT EXECUTIONER — strategies + closed-loop budget engine
 # ===========================================================================
 STRATEGY_A = {"id": "A", "displayName": "Paid Local Velocity", "prefix": "STRATA",
               "channels": ["facebook_act_now_ads", "google_maps_pin_boost"]}
@@ -386,7 +386,7 @@ REPORTS: List[dict] = build_reports_history(INITIAL_WEEKS)
 
 
 # ===========================================================================
-# ECHOLINK — odds, RFMD, drip
+# QUALITY CUSTOMER MAXIMIZER — odds, RFMD, drip
 # ===========================================================================
 def spin(is_new_guest: bool, segment: str = "new"):
     """Segment-aware Scan-to-Spin.
@@ -493,7 +493,7 @@ class SpinReq(BaseModel):
 # ===========================================================================
 @api.get("/")
 async def root():
-    return {"service": "expo-proxy-revenue-engine", "status": "ok"}
+    return {"service": "omnilocal-1-revenue-engine", "status": "ok"}
 
 
 @api.get("/overview")
@@ -548,19 +548,19 @@ async def content_critic(req: CriticReq):
     return {"report": score_video(SAMPLE_VIDEOS[idx]), "label": SAMPLE_VIDEOS[idx]["label"]}
 
 
-@api.get("/adsmith/allocation")
-async def adsmith_allocation():
+@api.get("/executioner/allocation")
+async def executioner_allocation():
     return REPORTS[-1]["allocation"]
 
 
-@api.get("/adsmith/reports")
-async def adsmith_reports():
+@api.get("/executioner/reports")
+async def executioner_reports():
     return {"reports": REPORTS, "channelLabels": CHANNEL_LABELS,
             "strategies": {"A": STRATEGY_A, "B": STRATEGY_B}}
 
 
-@api.post("/adsmith/reconcile")
-async def adsmith_reconcile():
+@api.post("/executioner/reconcile")
+async def executioner_reconcile():
     """Advance the closed loop one more week — 'watch it learn' live."""
     last = REPORTS[-1]
     prev_share_a = last["allocation"]["strategyA"]["share"]
@@ -588,20 +588,20 @@ async def adsmith_reconcile():
     return {"report": report, "reallocatedTo": decision["winner"]}
 
 
-@api.post("/adsmith/reset")
-async def adsmith_reset():
+@api.post("/executioner/reset")
+async def executioner_reset():
     global REPORTS
     REPORTS = build_reports_history(3)
     return {"ok": True, "weeks": len(REPORTS)}
 
 
-@api.post("/echolink/spin")
-async def echolink_spin(req: SpinReq):
+@api.post("/maximizer/spin")
+async def maximizer_spin(req: SpinReq):
     return spin(req.isNewGuest, req.segment)
 
 
-@api.get("/echolink/segments")
-async def echolink_segments():
+@api.get("/maximizer/segments")
+async def maximizer_segments():
     rows = rfmd_segment()
     counts = {"vip": 0, "standard": 0, "promo_pool": 0}
     for r in rows:
@@ -616,13 +616,13 @@ async def echolink_segments():
     return {"rows": rows, "counts": counts, "verification": verification}
 
 
-@api.get("/echolink/drip")
-async def echolink_drip():
+@api.get("/maximizer/drip")
+async def maximizer_drip():
     return drip_schedule()
 
 
 # ===========================================================================
-# CONNECTIONS — platform toggles that gate AdSmith
+# CONNECTIONS — platform toggles that gate the Ad Engine
 # ===========================================================================
 PLATFORMS = [
     {"id": "facebook", "label": "Facebook", "default": True},
@@ -794,7 +794,7 @@ async def set_connection(req: ConnReq):
             "connectedCount": sum(1 for v in CONNECTIONS.values() if v)}
 
 
-@api.get("/adsmith/recommended-plan")
+@api.get("/executioner/recommended-plan")
 async def get_recommended_plan():
     return recommended_plan()
 
@@ -820,6 +820,227 @@ async def codes_sample_csv():
 @api.post("/codes/reconcile")
 async def codes_reconcile(req: ReconcileReq):
     return reconcile_csv(req.csv, CURRENT_BATCH)
+
+
+# ===========================================================================
+# QUALITY CUSTOMER MAXIMIZER — 4 rotating games (30-day cycle)
+# ===========================================================================
+GAMES = [
+    {"id": "spin_wheel", "name": "Scan-to-Spin Wheel", "mechanic": "wheel",
+     "tagline": "Spin the wheel to reveal your reward.", "month": 1},
+    {"id": "scratch_card", "name": "Scratch-to-Win Card", "mechanic": "scratch",
+     "tagline": "Scratch the card to uncover your prize.", "month": 2},
+    {"id": "mystery_box", "name": "Mystery Prize Vault", "mechanic": "box",
+     "tagline": "Choose a vault, unlock a surprise.", "month": 3},
+    {"id": "lucky_slots", "name": "Lucky Match Slots", "mechanic": "slots",
+     "tagline": "Match three symbols to win big.", "month": 4},
+]
+ACTIVE_GAME_OVERRIDE: Optional[str] = None
+
+
+def active_game():
+    if ACTIVE_GAME_OVERRIDE:
+        g = next((x for x in GAMES if x["id"] == ACTIVE_GAME_OVERRIDE), None)
+        if g:
+            return {**g, "source": "admin_override"}
+    idx = (int(datetime.now(timezone.utc).timestamp()) // (60 * 60 * 24 * 30)) % len(GAMES)
+    return {**GAMES[idx], "source": "auto_rotation"}
+
+
+class GameReq(BaseModel):
+    gameId: Optional[str] = None
+
+
+@api.get("/maximizer/games")
+async def maximizer_games():
+    return {"games": GAMES, "active": active_game(), "rotationDays": 30, "override": ACTIVE_GAME_OVERRIDE}
+
+
+@api.put("/maximizer/games/active")
+async def maximizer_set_game(req: GameReq):
+    global ACTIVE_GAME_OVERRIDE
+    ACTIVE_GAME_OVERRIDE = req.gameId or None
+    return {"active": active_game(), "override": ACTIVE_GAME_OVERRIDE}
+
+
+# ===========================================================================
+# WEEKLY CUSTOMER CSV IMPORT — segmentation + new-customer welcome trigger
+# ===========================================================================
+OWNER_VIDEO_URL = os.environ.get(
+    "OWNER_WELCOME_VIDEO_URL",
+    "https://storage.googleapis.com/omnilocal-assets/owner-welcome-7s.mp4")
+WELCOME_SCRIPT = ("Thank you for enrolling and being a part of our rewards program. I'm the owner — "
+                  "small businesses are a dying breed, so your support truly matters. Thank you.")
+WELCOME_QUEUE: List[dict] = []
+
+
+class CustomerCsvReq(BaseModel):
+    csv: str
+
+
+def _segment_customer(visits: int, coupon_ratio: float) -> str:
+    if visits <= 1:
+        return "new"
+    if coupon_ratio >= 0.6:
+        return "coupon_only"
+    return "loyal"
+
+
+@api.get("/maximizer/sample-customer-csv")
+async def sample_customer_csv():
+    rng = random.Random(11)
+    names = ["Grace H.", "Leo P.", "The Ruiz Family", "Nina B.", "Marcus D.", "Priya S.",
+             "Owen T.", "Sasha K.", "Deli Regular", "First Timer Joe", "Coupon Carl", "Loyal Lucy"]
+    lines = ["name,email,visits,coupon_ratio"]
+    for i, n in enumerate(names):
+        v = 1 if i < 3 else rng.randint(2, 12)
+        cr = 0.1 if i < 3 else _round(rng.choice([0.0, 0.1, 0.2, 0.7, 0.9]))
+        email = n.lower().replace(" ", ".").replace("'", "") + "@example.com"
+        lines.append(f"{n},{email},{v},{cr}")
+    return {"csv": "\n".join(lines)}
+
+
+@api.post("/maximizer/import-csv")
+async def maximizer_import_csv(req: CustomerCsvReq):
+    counts = {"new": 0, "coupon_only": 0, "loyal": 0}
+    rows, new_queued = [], 0
+    for i, line in enumerate(req.csv.strip().splitlines()):
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 4:
+            continue
+        if i == 0 and parts[2].lower() in ("visits", "visit"):
+            continue  # header
+        name, email = parts[0], parts[1]
+        try:
+            visits = int(float(parts[2]))
+            coupon_ratio = float(parts[3])
+        except ValueError:
+            continue
+        seg = _segment_customer(visits, coupon_ratio)
+        counts[seg] += 1
+        rows.append({"name": name, "email": email, "visits": visits,
+                     "couponRatio": coupon_ratio, "segment": seg})
+        if seg == "new":
+            new_queued += 1
+            scheduled = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+            WELCOME_QUEUE.append({"name": name, "email": email, "status": "queued",
+                                  "scheduledAt": scheduled, "channel": "email"})
+    return {"imported": len(rows), "segments": counts, "rows": rows,
+            "newCustomersQueued": new_queued}
+
+
+@api.get("/maximizer/welcome-queue")
+async def maximizer_welcome_queue():
+    return {"queue": WELCOME_QUEUE, "ownerVideoUrl": OWNER_VIDEO_URL, "script": WELCOME_SCRIPT}
+
+
+# ===========================================================================
+# EMAIL ENGINE (Resend) — Anti-Spam Trickle + Welcome Automation
+# Sending is STUBBED until RESEND_API_KEY is set. Real sends include mandatory
+# Reply-To + List-Unsubscribe headers and a 15s throttle between messages.
+# ===========================================================================
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "owner@omnilocal.example")
+REPLY_TO_EMAIL = os.environ.get("REPLY_TO_EMAIL", SENDER_EMAIL)
+UNSUBSCRIBE_BASE = os.environ.get("UNSUBSCRIBE_BASE_URL", "https://omnilocal.example/unsubscribe")
+THROTTLE_SECONDS = 15  # mandatory anti-burst throttle between individual sends
+
+
+def sanitize_content(text: str) -> dict:
+    warnings = []
+    words = re.findall(r"[A-Za-z]{4,}", text)
+    caps = [w for w in words if w.isupper()]
+    if len(caps) >= 3:
+        warnings.append(f"{len(caps)} ALL-CAPS words — softens deliverability. Consider sentence case.")
+    excl = text.count("!")
+    if excl > 2:
+        warnings.append(f"{excl} exclamation points — reduce to at most 2 to avoid spam filters.")
+    if re.search(r'<img[^>]*(width=["\']?1["\']?|height=["\']?1["\']?)', text, re.IGNORECASE):
+        warnings.append("Hidden 1x1 tracking pixel detected — removed for deliverability.")
+    cleaned = re.sub(r'<img[^>]*(width=["\']?1["\']?|height=["\']?1["\']?)[^>]*>', "", text, flags=re.IGNORECASE)
+    spammy = ["FREE!!!", "ACT NOW", "100% FREE", "CLICK HERE", "LIMITED TIME"]
+    hits = [s for s in spammy if s.lower() in text.lower()]
+    if hits:
+        warnings.append(f"Spam-trigger phrases: {', '.join(hits)}.")
+    return {"clean": cleaned, "warnings": warnings, "spamScore": min(len(warnings), 5)}
+
+
+def build_email_headers(unsub_url: str) -> dict:
+    return {
+        "Reply-To": REPLY_TO_EMAIL,
+        "List-Unsubscribe": f"<{unsub_url}>, <mailto:unsubscribe@{SENDER_EMAIL.split('@')[-1]}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
+
+
+async def send_via_resend(to: str, subject: str, html: str, unsub_url: str) -> dict:
+    headers = build_email_headers(unsub_url)
+    if not RESEND_API_KEY:
+        logger.info(f"[EMAIL STUB] -> {to} | subj='{subject}' | headers={list(headers)}")
+        return {"status": "stubbed", "to": to, "headers": headers,
+                "note": "Set RESEND_API_KEY to enable live sending."}
+    import resend
+    resend.api_key = RESEND_API_KEY
+    params = {"from": SENDER_EMAIL, "to": [to], "subject": subject, "html": html, "headers": headers}
+    res = await asyncio.to_thread(resend.Emails.send, params)
+    return {"status": "sent", "to": to, "id": res.get("id"), "headers": headers}
+
+
+def trickle_sample_content() -> dict:
+    html = ("<h2>A quiet Tuesday story from our kitchen</h2>"
+            "<p>Our cook Marco has made the Sunday Gravy every week for nine years. "
+            "This week he shared why the sauce simmers for six hours — a family ritual "
+            "from his grandmother in Naples.</p>"
+            "<p><a href='https://youtube.com/watch?v=demo'>Watch the 90-second story »</a></p>"
+            "<p>Because you're part of our community, here's 15% off your next sub — "
+            "just show this email at the counter this week.</p>")
+    return {"subject": "The six-hour secret behind our Sunday Gravy", "html": html}
+
+
+class PreviewReq(BaseModel):
+    content: str
+
+
+@api.post("/email/preview")
+async def email_preview(req: PreviewReq):
+    return sanitize_content(req.content)
+
+
+@api.get("/email/trickle-plan")
+async def email_trickle_plan(total: int = 3000):
+    days = 30
+    per_day = -(-total // days)
+    sample = trickle_sample_content()
+    san = sanitize_content(sample["html"])
+    return {
+        "totalList": total, "days": days, "perDay": per_day,
+        "throttleSeconds": THROTTLE_SECONDS,
+        "provider": "resend", "liveSending": bool(RESEND_API_KEY),
+        "headers": build_email_headers(UNSUBSCRIBE_BASE + "?u=example"),
+        "sampleContent": sample, "sanitization": san,
+        "philosophy": ("Quality-first: long-form story or video, offer at the end. "
+                       f"~{per_day} recipients/day, 1 email every {THROTTLE_SECONDS}s — never a mass blast."),
+    }
+
+
+class SendWelcomeReq(BaseModel):
+    index: int = 0
+
+
+@api.post("/email/send-welcome")
+async def email_send_welcome(req: SendWelcomeReq):
+    if not WELCOME_QUEUE:
+        return {"status": "empty", "note": "No new customers queued. Import a CSV first."}
+    idx = max(0, min(req.index, len(WELCOME_QUEUE) - 1))
+    item = WELCOME_QUEUE[idx]
+    unsub = f"{UNSUBSCRIBE_BASE}?e={item['email']}"
+    html = (f"<div style='font-family:sans-serif'><h2>A personal thank-you</h2>"
+            f"<p><video src='{OWNER_VIDEO_URL}' controls width='320'></video></p>"
+            f"<p>{WELCOME_SCRIPT}</p></div>")
+    res = await send_via_resend(item["email"], "A personal thank-you from the owner", html, unsub)
+    item["status"] = "sent" if res["status"] in ("sent", "stubbed") else "failed"
+    item["deliveryMode"] = res["status"]
+    return {"result": res, "videoUrl": OWNER_VIDEO_URL, "queueItem": item}
 
 
 app.include_router(api)

@@ -7,6 +7,7 @@ import {
 import { Trophy, Play, RotateCcw, MapPin, Plug } from "lucide-react";
 import { getReports, reconcile, resetLoop, getRecommendedPlan } from "@/lib/api";
 import { SectionTitle, Overline, usd } from "@/components/ui-bits";
+import Connections from "@/sections/Connections";
 
 function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
   return (
@@ -24,14 +25,10 @@ function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
           </span>
         )}
       </div>
-
       <div className="flex items-baseline gap-2 mt-4">
-        <span className="mono" style={{ fontSize: "2.2rem", fontWeight: 700, color: "var(--primary)" }}>
-          {usd(alloc.dollars)}
-        </span>
+        <span className="mono" style={{ fontSize: "2.2rem", fontWeight: 700, color: "var(--primary)" }}>{usd(alloc.dollars)}</span>
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>/ {(alloc.share * 100).toFixed(0)}% of budget</span>
       </div>
-
       <div className="mt-4 space-y-2">
         {Object.entries(alloc.perChannel).map(([ch, amt]) => (
           <div key={ch} className="flex justify-between text-sm">
@@ -40,7 +37,6 @@ function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
           </div>
         ))}
       </div>
-
       <div className="grid grid-cols-2 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
         <div><Overline>Revenue</Overline><div className="money text-xl">{usd(metrics.revenue)}</div></div>
         <div><Overline>ROAS</Overline><div className="mono text-xl" style={{ color: "var(--success)" }}>{metrics.roas}×</div></div>
@@ -51,7 +47,7 @@ function StrategyCard({ strat, alloc, metrics, labels, isWinner }) {
   );
 }
 
-export default function AdSmith() {
+export default function Executioner() {
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -86,12 +82,11 @@ export default function AdSmith() {
     "Strategy B %": Math.round(r.allocation.strategyB.share * 100),
     roas: r.blendedRoas,
   }));
-
   const zips = Object.entries(latest.zipBreakdown).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
 
   return (
     <div className="p-6 md:p-12 max-w-[1200px]">
-      <SectionTitle kicker="Module 02 · AdSmith"
+      <SectionTitle kicker="Ad Engine · Quality Content Executioner"
         title="The autonomous media buyer that gets smarter every week"
         subtitle="Set a weekly budget. It splits spend across two strategies, attributes every order via promo codes, then shifts money 70/30 toward whichever produced more real revenue. Clicks are a promise. Orders are proof." />
 
@@ -114,18 +109,13 @@ export default function AdSmith() {
           metrics={latest.metrics.strategyB} labels={data.channelLabels} isWinner={winner === "B"} />
       </div>
 
-      {/* Connection-aware recommended plan */}
       {plan && (
         <div className="card p-6 md:p-8 mt-8" data-testid="recommended-plan">
           <div className="flex items-center gap-2"><Plug size={18} color="var(--primary)" /><Overline>This Week's Recommended Plan · gated by your connected platforms</Overline></div>
           <h3 className="serif text-2xl mt-1">It only spends where you're actually present</h3>
-          {plan.warning && (
-            <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "#fdece9", color: "#C0392B" }}>{plan.warning}</div>
-          )}
+          {plan.warning && <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "#fdece9", color: "#C0392B" }}>{plan.warning}</div>}
           {plan.diversificationTip && (
-            <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "var(--surface-alt)", color: "var(--text-secondary)" }} data-testid="diversification-tip">
-              💡 {plan.diversificationTip}
-            </div>
+            <div className="mt-3 p-3 rounded-lg text-sm" style={{ background: "var(--surface-alt)", color: "var(--text-secondary)" }} data-testid="diversification-tip">💡 {plan.diversificationTip}</div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {[plan.strategyA, plan.strategyB].map((s, i) => (
@@ -141,9 +131,7 @@ export default function AdSmith() {
                       <span className="mono">{usd(amt)}</span>
                     </div>
                   ))}
-                  {Object.keys(s.perChannel).length === 0 && (
-                    <div className="text-sm" style={{ color: "var(--text-secondary)" }}>No connected channels.</div>
-                  )}
+                  {Object.keys(s.perChannel).length === 0 && <div className="text-sm" style={{ color: "var(--text-secondary)" }}>No connected channels.</div>}
                   {s.excludedChannels.map((c) => (
                     <div key={c.channel} className="flex justify-between text-sm" style={{ opacity: 0.5 }} data-testid={`excluded-${c.platform}`}>
                       <span style={{ textDecoration: "line-through" }}>{c.label}</span>
@@ -155,26 +143,19 @@ export default function AdSmith() {
             ))}
           </div>
           <p className="text-xs mt-3" style={{ color: "var(--text-secondary)" }}>
-            Toggle platforms in <b>Connections</b> — struck-through channels are ones AdSmith won't recommend until you connect them.
+            Toggle platforms below — struck-through channels are ones OmniLocal #1 won't recommend until you connect them.
           </p>
         </div>
       )}
 
-      {/* Learning chart */}
       <div className="card p-6 md:p-8 mt-8">
         <Overline style={{ color: "var(--primary)" }}>The Learning Loop</Overline>
         <h3 className="serif text-2xl mt-1">50/50 → 70/30 → 80/20 — money follows the winner</h3>
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={chart} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
             <defs>
-              <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#D35400" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#D35400" stopOpacity={0.03} />
-              </linearGradient>
-              <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2980B9" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#2980B9" stopOpacity={0.03} />
-              </linearGradient>
+              <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#D35400" stopOpacity={0.35} /><stop offset="100%" stopColor="#D35400" stopOpacity={0.03} /></linearGradient>
+              <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2980B9" stopOpacity={0.3} /><stop offset="100%" stopColor="#2980B9" stopOpacity={0.03} /></linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
             <XAxis dataKey="weekOf" tick={{ fontSize: 11, fill: "#5C5A56" }} tickLine={false} axisLine={{ stroke: "#E8E6DF" }} />
@@ -187,7 +168,6 @@ export default function AdSmith() {
         </ResponsiveContainer>
       </div>
 
-      {/* Zip breakdown */}
       <div className="card p-6 md:p-8 mt-8">
         <div className="flex items-center gap-2"><MapPin size={18} color="var(--primary)" /><Overline>Where the money came from</Overline></div>
         <h3 className="serif text-2xl mt-1">Revenue by ZIP · this week</h3>
@@ -198,8 +178,7 @@ export default function AdSmith() {
               <div key={zip} className="flex items-center gap-3" data-testid={`zip-${zip}`}>
                 <span className="mono text-sm" style={{ minWidth: 60 }}>{zip}</span>
                 <div className="flex-1 h-6 rounded" style={{ background: "var(--surface-alt)" }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${(s.revenue / max) * 100}%` }}
-                    className="h-6 rounded" style={{ background: "var(--success)" }} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${(s.revenue / max) * 100}%` }} className="h-6 rounded" style={{ background: "var(--success)" }} />
                 </div>
                 <span className="money text-sm" style={{ minWidth: 90, textAlign: "right" }}>{usd(s.revenue)}</span>
               </div>
@@ -207,6 +186,9 @@ export default function AdSmith() {
           })}
         </div>
       </div>
+
+      {/* Platform connections gate this engine */}
+      <div className="mt-4"><Connections /></div>
     </div>
   );
 }

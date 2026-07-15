@@ -33,7 +33,7 @@ export default function Overview() {
     <div className="p-6 md:p-12 max-w-[1200px]">
       <Overline style={{ color: "var(--primary)" }}>{brand.name} · {brand.city}</Overline>
       <h1 className="text-4xl md:text-6xl mt-2" style={{ fontWeight: 300 }}>
-        This isn't marketing. It's a <span style={{ color: "var(--primary)" }}>revenue engine.</span>
+        This is your one and only <span style={{ color: "var(--primary)" }}>revenue engine</span> that you will ever need.
       </h1>
       <p className="mt-3 max-w-2xl" style={{ color: "var(--text-secondary)" }}>
         Everyone else helps you look busy. This makes you money — targeting the customers who convert,
@@ -93,7 +93,7 @@ export default function Overview() {
           </ul>
         </div>
         <div className="card p-8" style={{ background: "#f1f8f3", borderColor: "#c9e7d5" }} data-testid="ourway-card">
-          <Overline style={{ color: "var(--success)" }}>This · Expo Proxy</Overline>
+          <Overline style={{ color: "var(--success)" }}>This · OmniLocal #1</Overline>
           <div className="mono mt-2" style={{ fontSize: "2.5rem", fontWeight: 700, color: "var(--success)" }}>{usd(valpak.ourCost)}</div>
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>{valpak.ourReachNote}</div>
           <ul className="mt-4 space-y-2 text-sm">
