@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Facebook, Instagram, MapPin, Music2, Youtube, Check, Info, Video } from "lucide-react";
-import { getConnections, setConnection } from "@/lib/api";
+import { Facebook, Instagram, MapPin, Music2, Youtube, Check, Info, Video, Link2, ShieldCheck } from "lucide-react";
+import { getConnections, setConnection, oauthStart, oauthCallback } from "@/lib/api";
 import { SectionTitle, Overline } from "@/components/ui-bits";
 
 const ICONS = {
@@ -9,7 +9,7 @@ const ICONS = {
 };
 
 const SETUP_HINTS = {
-  tiktok: "Create a TikTok Business account + link a page before the call.",
+  tiktok: "Create a TikTok Business account + link a page before you connect.",
   youtube: "Set up a YouTube channel; enable Shorts.",
   instagram: "Convert to a Professional (Business) account and link your Facebook Page.",
   facebook: "Create a Facebook Business Page (not just a profile).",
@@ -23,15 +23,30 @@ export default function Connections() {
   const load = () => getConnections().then(setData).catch(() => {});
   useEffect(() => { load(); }, []);
 
-  const toggle = async (platform, connected) => {
+  // OAuth "Connect" handshake via the Unified API provider (stubbed end-to-end).
+  const connect = async (platform, label) => {
     setBusy(platform);
     try {
-      const res = await setConnection(platform, connected);
+      const start = await oauthStart(platform);
+      toast.message(`Authorizing ${label}…`, {
+        description: `Redirecting through ${start.provider}${start.live ? "" : " (demo handshake)"}`,
+      });
+      const res = await oauthCallback(platform, "demo_auth_code");
       setData(res);
-      toast[connected ? "success" : "message"](
-        `${platform} ${connected ? "connected" : "disconnected"}`,
-        { description: connected ? "the Ad Engine can now allocate budget here." : "the Ad Engine will stop recommending this channel." }
-      );
+      toast.success(`${label} authorized`, {
+        description: `Token received via ${start.provider} — the Ad Engine can now publish & spend here.`,
+      });
+    } catch {
+      toast.error(`Could not authorize ${label}. Try again.`);
+    } finally { setBusy(null); }
+  };
+
+  const disconnect = async (platform, label) => {
+    setBusy(platform);
+    try {
+      const res = await setConnection(platform, false);
+      setData(res);
+      toast.message(`${label} disconnected`, { description: "the Ad Engine will stop recommending this channel." });
     } finally { setBusy(null); }
   };
 
@@ -40,9 +55,9 @@ export default function Connections() {
 
   return (
     <div className="p-6 md:p-12 max-w-[1200px]">
-      <SectionTitle kicker="Onboarding · Connections"
-        title="Connect your platforms — the Ad Engine only spends where you're present"
-        subtitle="Toggle on the channels you actually have. the Ad Engine will never recommend a platform you're not connected to. Connect 3–4 for the widest reach." />
+      <SectionTitle kicker="Onboarding · Social Media Connector"
+        title="Connect your platforms — authorize once, publish everywhere"
+        subtitle={`Authorize each account through our Unified API provider (${data.provider}). the Ad Engine only spends where you're connected — connect 3–4 for the widest reach.`} />
 
       <div className="card p-5 mb-6 flex items-start gap-3" style={{ background: "var(--surface-alt)" }} data-testid="diversification-banner">
         <Info size={18} color="var(--primary)" className="mt-0.5" />
@@ -59,6 +74,7 @@ export default function Connections() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data.platforms.map((p) => {
           const Icon = ICONS[p.id] || Video;
+          const working = busy === p.id;
           return (
             <div key={p.id} className="card p-5 flex items-center justify-between lift"
               data-testid={`platform-${p.id}`}
@@ -71,19 +87,25 @@ export default function Connections() {
                 <div>
                   <div className="font-bold">{p.label}</div>
                   <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                    {p.connected ? <span style={{ color: "var(--success)" }}><Check size={11} className="inline" /> Connected</span> : SETUP_HINTS[p.id]}
+                    {p.connected
+                      ? <span style={{ color: "var(--success)" }}>
+                          <ShieldCheck size={11} className="inline" /> Authorized{p.authMode ? ` · ${p.authMode}` : ""}
+                        </span>
+                      : SETUP_HINTS[p.id]}
                   </div>
                 </div>
               </div>
-              <button
-                data-testid={`toggle-${p.id}`}
-                disabled={busy === p.id}
-                onClick={() => toggle(p.id, !p.connected)}
-                className="relative rounded-full transition-colors"
-                style={{ width: 48, height: 26, background: p.connected ? "var(--success)" : "#cfccc4" }}>
-                <span className="absolute rounded-full bg-white transition-transform"
-                  style={{ width: 20, height: 20, top: 3, left: 3, transform: p.connected ? "translateX(22px)" : "translateX(0)" }} />
-              </button>
+              {p.connected ? (
+                <button data-testid={`disconnect-${p.id}`} disabled={working}
+                  onClick={() => disconnect(p.id, p.label)} className="btn btn-ghost text-sm" style={{ padding: "0.4rem 0.9rem" }}>
+                  <Check size={13} className="inline mr-1" /> Connected
+                </button>
+              ) : (
+                <button data-testid={`connect-${p.id}`} disabled={working}
+                  onClick={() => connect(p.id, p.label)} className="btn btn-primary text-sm" style={{ padding: "0.4rem 0.9rem" }}>
+                  <Link2 size={13} className="inline mr-1" /> {working ? "Authorizing…" : "Connect"}
+                </button>
+              )}
             </div>
           );
         })}
@@ -93,14 +115,14 @@ export default function Connections() {
         <Overline style={{ color: "var(--primary)" }}>Before your onboarding Zoom</Overline>
         <h3 className="serif text-2xl mt-1">Make the call efficient — set these up first</h3>
         <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>
-          Send new restaurants this prep list so call time isn't spent creating accounts. On the call, we just toggle on
-          what's ready and connect them in minutes.
+          Send new restaurants this prep list so call time isn't spent creating accounts. On the call, we click <b>Connect</b>,
+          authorize through the Unified API provider, and they're live in minutes.
         </p>
         <ul className="mt-4 space-y-2 text-sm">
           {data.platforms.filter((p) => !p.connected).map((p) => (
             <li key={p.id} className="flex gap-2"><span style={{ color: "var(--primary)" }}>→</span> <b>{p.label}:</b> {SETUP_HINTS[p.id]}</li>
           ))}
-          {data.platforms.every((p) => p.connected) && <li style={{ color: "var(--success)" }}>All platforms connected — you're fully set up!</li>}
+          {data.platforms.every((p) => p.connected) && <li style={{ color: "var(--success)" }}>All platforms authorized — you're fully set up!</li>}
         </ul>
       </div>
     </div>

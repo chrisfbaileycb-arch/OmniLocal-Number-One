@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Clapperboard, Sparkles, Video } from "lucide-react";
+import { Clapperboard, Sparkles, Video, Share2 } from "lucide-react";
 import { getPrompts, postCopy, postCritic } from "@/lib/api";
 import { SectionTitle, Overline, GradeBadge } from "@/components/ui-bits";
 
@@ -96,6 +96,25 @@ export default function ContentDirector() {
           </div>
         </div>
       </div>
+
+      {/* Distribution pathways */}
+      {data.distribution && (
+        <div className="card p-6 md:p-8 mt-8" data-testid="distribution-pathways">
+          <div className="flex items-center gap-2"><Share2 size={18} color="var(--primary)" /><Overline>Distribution Pathways · one film, five surfaces</Overline></div>
+          <h3 className="serif text-2xl mt-1">Where every clip gets published</h3>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+            Authorize these accounts in the Connector (under the Ad Engine) and OmniLocal #1 pushes each asset to the right surface automatically.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+            {data.distribution.map((d) => (
+              <div key={d.platform} className="p-4 rounded-lg" style={{ border: "1px solid var(--border)" }} data-testid={`pathway-${d.platform}`}>
+                <div className="font-bold text-sm">{d.label}</div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{d.surface} · {d.contentType}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Speech to copy */}
       <div className="card p-6 md:p-8 mt-8">

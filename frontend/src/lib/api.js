@@ -21,6 +21,11 @@ export const getRecommendedPlan = () => client.get("/executioner/recommended-pla
 export const getConnections = () => client.get("/connections").then((r) => r.data);
 export const setConnection = (platform, connected) =>
   client.put("/connections", { platform, connected }).then((r) => r.data);
+export const getPathways = () => client.get("/connections/pathways").then((r) => r.data);
+export const oauthStart = (platform) =>
+  client.get(`/connections/oauth/${platform}/start`).then((r) => r.data);
+export const oauthCallback = (platform, code) =>
+  client.post("/connections/oauth/callback", { platform, code }).then((r) => r.data);
 
 // Quality Customer Maximizer (Rewards / Gamification)
 export const getGames = () => client.get("/maximizer/games").then((r) => r.data);

@@ -17,6 +17,7 @@ from starlette.middleware.cors import CORSMiddleware
 import os
 import re
 import random
+import asyncio
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -531,9 +532,18 @@ async def overview():
 async def content_prompts():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return {"prompts": SHOOTING_PROMPTS, "today": daily_prompt(today),
-            "assetVault": ASSET_VAULT, "sampleVideos":
+            "assetVault": ASSET_VAULT,
+            "distribution": DISTRIBUTION_PATHWAYS,
+            "sampleVideos":
             [{"index": i, "filename": v["filename"], "label": v["label"]}
              for i, v in enumerate(SAMPLE_VIDEOS)]}
+
+
+@api.get("/content/distribution")
+async def content_distribution():
+    """Distribution pathways the Content Director publishes to via the connector."""
+    return {"pathways": DISTRIBUTION_PATHWAYS, "provider": UNIFIED_PROVIDER,
+            "connections": {p["id"]: CONNECTIONS[p["id"]] for p in PLATFORMS}}
 
 
 @api.post("/content/copy")
@@ -632,6 +642,32 @@ PLATFORMS = [
     {"id": "youtube", "label": "YouTube", "default": False},
 ]
 CONNECTIONS: Dict[str, bool] = {p["id"]: p["default"] for p in PLATFORMS}
+
+# ---------------------------------------------------------------------------
+# DISTRIBUTION PATHWAYS — where Content Director publishes each content type.
+# These are the surfaces the Social Media Connector authorizes and posts to.
+# ---------------------------------------------------------------------------
+DISTRIBUTION_PATHWAYS = [
+    {"platform": "google", "label": "Google Business Profile (Maps)", "surface": "GBP Post",
+     "contentType": "post", "scope": "business.manage"},
+    {"platform": "facebook", "label": "Facebook Reels", "surface": "Reel",
+     "contentType": "video", "scope": "pages_manage_posts,pages_read_engagement"},
+    {"platform": "instagram", "label": "Instagram Reels", "surface": "Reel",
+     "contentType": "video", "scope": "instagram_content_publish"},
+    {"platform": "tiktok", "label": "TikTok", "surface": "Short Video",
+     "contentType": "video", "scope": "video.publish"},
+    {"platform": "youtube", "label": "YouTube Shorts", "surface": "Short",
+     "contentType": "video", "scope": "youtube.upload"},
+]
+
+# ---------------------------------------------------------------------------
+# OAUTH HANDSHAKE — Unified API provider (stubbed until UNIFIED_API_KEY set).
+# The connector exposes a start (authorize) + callback (token exchange) flow.
+# Tokens are stored in-memory for the demo; real tokens arrive via the provider.
+# ---------------------------------------------------------------------------
+UNIFIED_PROVIDER = os.environ.get("UNIFIED_SOCIAL_PROVIDER", "unified_api")
+UNIFIED_API_KEY = os.environ.get("UNIFIED_API_KEY")  # stubbed until provided
+OAUTH_TOKENS: Dict[str, dict] = {}
 
 # Potential paid/organic channels per strategy, each tied to a platform.
 CHANNEL_PLATFORM = {
@@ -780,18 +816,78 @@ class ConnReq(BaseModel):
     connected: bool
 
 
+class OAuthCallbackReq(BaseModel):
+    platform: str
+    code: Optional[str] = None
+
+
+def _connections_payload():
+    return {
+        "platforms": [{
+            **p,
+            "connected": CONNECTIONS[p["id"]],
+            "authorized": p["id"] in OAUTH_TOKENS,
+            "authMode": OAUTH_TOKENS.get(p["id"], {}).get("mode"),
+        } for p in PLATFORMS],
+        "connectedCount": sum(1 for v in CONNECTIONS.values() if v),
+        "provider": UNIFIED_PROVIDER,
+        "liveOAuth": bool(UNIFIED_API_KEY),
+    }
+
+
 @api.get("/connections")
 async def get_connections():
-    return {"platforms": [{**p, "connected": CONNECTIONS[p["id"]]} for p in PLATFORMS],
-            "connectedCount": sum(1 for v in CONNECTIONS.values() if v)}
+    return _connections_payload()
 
 
 @api.put("/connections")
 async def set_connection(req: ConnReq):
     if req.platform in CONNECTIONS:
         CONNECTIONS[req.platform] = req.connected
-    return {"platforms": [{**p, "connected": CONNECTIONS[p["id"]]} for p in PLATFORMS],
-            "connectedCount": sum(1 for v in CONNECTIONS.values() if v)}
+        if not req.connected:
+            OAUTH_TOKENS.pop(req.platform, None)
+    return _connections_payload()
+
+
+@api.get("/connections/pathways")
+async def connection_pathways():
+    return {"pathways": DISTRIBUTION_PATHWAYS, "provider": UNIFIED_PROVIDER,
+            "liveOAuth": bool(UNIFIED_API_KEY)}
+
+
+@api.get("/connections/oauth/{platform}/start")
+async def oauth_start(platform: str):
+    """Begin the OAuth handshake — returns the provider authorize URL + state.
+    Stubbed until UNIFIED_API_KEY is set; real flow redirects the owner to the
+    Unified API provider's hosted authorization screen."""
+    if platform not in CONNECTIONS:
+        return {"error": "unknown platform"}
+    state = "".join(random.choice(CODE_ALPHABET) for _ in range(16))
+    authorize_url = (f"https://auth.{UNIFIED_PROVIDER}.example/authorize"
+                     f"?platform={platform}&state={state}&provider={UNIFIED_PROVIDER}")
+    return {"platform": platform, "state": state, "provider": UNIFIED_PROVIDER,
+            "authorizeUrl": authorize_url, "live": bool(UNIFIED_API_KEY),
+            "note": "Stubbed handshake. Set UNIFIED_API_KEY to route through the live provider."}
+
+
+@api.post("/connections/oauth/callback")
+async def oauth_callback(req: OAuthCallbackReq):
+    """Complete the OAuth handshake — exchanges the code for a token and marks
+    the platform authorized/connected. In the stub, a mock token is issued."""
+    if req.platform not in CONNECTIONS:
+        return {"error": "unknown platform"}
+    token = {
+        "accessToken": "stub_" + "".join(random.choice(CODE_ALPHABET) for _ in range(24)),
+        "provider": UNIFIED_PROVIDER,
+        "connectedAt": datetime.now(timezone.utc).isoformat(),
+        "mode": "live" if UNIFIED_API_KEY else "stubbed",
+    }
+    OAUTH_TOKENS[req.platform] = token
+    CONNECTIONS[req.platform] = True
+    payload = _connections_payload()
+    payload["authorized"] = {"platform": req.platform, "mode": token["mode"],
+                             "connectedAt": token["connectedAt"]}
+    return payload
 
 
 @api.get("/executioner/recommended-plan")
