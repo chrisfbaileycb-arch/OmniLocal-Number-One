@@ -12,6 +12,8 @@ export const getOverview = () => client.get("/overview").then((r) => r.data);
 export const getPrompts = () => client.get("/content/prompts").then((r) => r.data);
 export const postCopy = (transcript) => client.post("/content/copy", { transcript }).then((r) => r.data);
 export const postCritic = (index) => client.post("/content/critic", { index }).then((r) => r.data);
+export const publishAll = (assetId, caption) =>
+  client.post("/content/publish-all", { assetId, caption }).then((r) => r.data);
 
 // Quality Content Executioner (Ad Engine)
 export const getReports = () => client.get("/executioner/reports").then((r) => r.data);

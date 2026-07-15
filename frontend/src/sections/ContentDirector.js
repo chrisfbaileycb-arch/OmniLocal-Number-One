@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Clapperboard, Sparkles, Video, Share2 } from "lucide-react";
-import { getPrompts, postCopy, postCritic } from "@/lib/api";
+import { Clapperboard, Sparkles, Video, Share2, Rocket, CheckCircle2, MinusCircle, Loader2 } from "lucide-react";
+import { getPrompts, postCopy, postCritic, publishAll } from "@/lib/api";
 import { SectionTitle, Overline, GradeBadge } from "@/components/ui-bits";
 
 const VAULT_IMAGES = {
@@ -43,6 +43,8 @@ export default function ContentDirector() {
   const [drafts, setDrafts] = useState(null);
   const [report, setReport] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishRes, setPublishRes] = useState(null);
 
   useEffect(() => { getPrompts().then(setData).catch(() => {}); }, []);
 
@@ -59,6 +61,22 @@ export default function ContentDirector() {
     const res = await postCritic(index);
     setReport(res.report);
     toast(`Graded: ${label}`, { description: `Overall: ${res.report.overall}` });
+  };
+
+  const blastAll = async () => {
+    setPublishing(true); setPublishRes(null);
+    try {
+      const caption = drafts ? drafts.instagram : "New from our kitchen";
+      const res = await publishAll("hero-clip", caption);
+      setPublishRes(res);
+      if (res.publishedCount === 0) {
+        toast.error("No authorized pathways", { description: "Connect platforms in the Ad Engine → Connector first." });
+      } else {
+        toast.success(`Published to ${res.publishedCount} of ${res.totalPathways} surfaces`, {
+          description: `${res.results.filter((r) => r.status === "skipped").length} skipped (not connected)${res.live ? "" : " · demo blast"}`,
+        });
+      }
+    } finally { setPublishing(false); }
   };
 
   if (!data) return <div className="p-10" style={{ color: "var(--text-secondary)" }}>Loading…</div>;
@@ -100,19 +118,46 @@ export default function ContentDirector() {
       {/* Distribution pathways */}
       {data.distribution && (
         <div className="card p-6 md:p-8 mt-8" data-testid="distribution-pathways">
-          <div className="flex items-center gap-2"><Share2 size={18} color="var(--primary)" /><Overline>Distribution Pathways · one film, five surfaces</Overline></div>
-          <h3 className="serif text-2xl mt-1">Where every clip gets published</h3>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2"><Share2 size={18} color="var(--primary)" /><Overline>Distribution Pathways · one film, five surfaces</Overline></div>
+              <h3 className="serif text-2xl mt-1">Publish everywhere in one click</h3>
+            </div>
+            <button className="btn btn-primary" onClick={blastAll} disabled={publishing} data-testid="publish-all-btn">
+              {publishing ? <Loader2 size={15} className="inline mr-1 animate-spin" /> : <Rocket size={15} className="inline mr-1" />}
+              {publishing ? "Blasting…" : "Publish All"}
+            </button>
+          </div>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Authorize these accounts in the Connector (under the Ad Engine) and OmniLocal #1 pushes each asset to the right surface automatically.
+            Publish-All runs one cycle across every authorized pathway. Connect accounts in the Ad Engine → Connector; unconnected surfaces are skipped automatically.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-            {data.distribution.map((d) => (
-              <div key={d.platform} className="p-4 rounded-lg" style={{ border: "1px solid var(--border)" }} data-testid={`pathway-${d.platform}`}>
-                <div className="font-bold text-sm">{d.label}</div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{d.surface} · {d.contentType}</div>
-              </div>
-            ))}
+            {data.distribution.map((d) => {
+              const res = publishRes && publishRes.results.find((r) => r.platform === d.platform);
+              const done = res && res.status === "published";
+              const skipped = res && res.status === "skipped";
+              return (
+                <div key={d.platform} className="p-4 rounded-lg" data-testid={`pathway-${d.platform}`}
+                  style={{ border: `1px solid ${done ? "var(--success)" : "var(--border)"}`, opacity: skipped ? 0.55 : 1 }}>
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-sm">{d.label}</div>
+                    {done && <CheckCircle2 size={16} color="var(--success)" data-testid={`publish-status-${d.platform}`} />}
+                    {skipped && <MinusCircle size={16} color="var(--text-secondary)" data-testid={`publish-status-${d.platform}`} />}
+                    {publishing && !res && <Loader2 size={16} className="animate-spin" color="var(--primary)" />}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                    {done ? "Published ✓" : skipped ? "Skipped · not connected" : `${d.surface} · ${d.contentType}`}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+          {publishRes && (
+            <div className="mt-4 p-3 rounded-lg text-sm" style={{ background: "var(--surface-alt)", color: "var(--text-secondary)" }} data-testid="publish-summary">
+              Blast complete — <b style={{ color: "var(--success)" }}>{publishRes.publishedCount} published</b>, {publishRes.totalPathways - publishRes.publishedCount} skipped.
+              {!publishRes.live && " (Stubbed — live posting activates once the Unified API key is added.)"}
+            </div>
+          )}
         </div>
       )}
 

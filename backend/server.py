@@ -546,6 +546,36 @@ async def content_distribution():
             "connections": {p["id"]: CONNECTIONS[p["id"]] for p in PLATFORMS}}
 
 
+class PublishAllReq(BaseModel):
+    assetId: Optional[str] = None
+    caption: Optional[str] = None
+
+
+@api.post("/content/publish-all")
+async def content_publish_all(req: PublishAllReq):
+    """Unified 'Publish-All' — one execution cycle across every authorized pathway.
+    Iterates all distribution pathways; publishes to connected/authorized platforms
+    and skips the rest. Stubbed until UNIFIED_API_KEY enables live posting."""
+    rng = random.Random()
+    results, published = [], 0
+    for path in DISTRIBUTION_PATHWAYS:
+        platform = path["platform"]
+        connected = CONNECTIONS.get(platform, False)
+        base = {"platform": platform, "label": path["label"], "surface": path["surface"]}
+        if connected:
+            published += 1
+            mode = OAUTH_TOKENS.get(platform, {}).get("mode", "manual")
+            results.append({**base, "status": "published", "mode": mode,
+                            "postUrl": f"https://{platform}.example/p/{_gen_code(8, rng)}"})
+        else:
+            results.append({**base, "status": "skipped", "reason": "not connected"})
+    return {"assetId": req.assetId, "caption": req.caption,
+            "publishedCount": published, "totalPathways": len(DISTRIBUTION_PATHWAYS),
+            "results": results, "queuedAt": datetime.now(timezone.utc).isoformat(),
+            "live": bool(UNIFIED_API_KEY),
+            "note": "Stubbed distribution. Live posting activates with UNIFIED_API_KEY."}
+
+
 @api.post("/content/copy")
 async def content_copy(req: CopyReq):
     normalized = normalize_transcript(req.transcript)

@@ -141,6 +141,70 @@ class TestContentDirector:
 
 
 # ============================================================================
+# PUBLISH-ALL — unified content blast across authorized pathways
+# ============================================================================
+class TestPublishAll:
+    def test_publish_all_default_state(self, s):
+        """Default connections: facebook/instagram/google ON; tiktok/youtube OFF."""
+        # Ensure default state: disconnect tiktok/youtube in case a previous test left them on
+        s.put(f"{API}/connections", json={"platform": "tiktok", "connected": False}, timeout=15)
+        s.put(f"{API}/connections", json={"platform": "youtube", "connected": False}, timeout=15)
+        r = s.post(f"{API}/content/publish-all",
+                   json={"assetId": "hero-clip", "caption": "hello world"}, timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["totalPathways"] == 5
+        assert d["publishedCount"] == 3
+        assert d["live"] is False
+        assert len(d["results"]) == 5
+        by_platform = {r_["platform"]: r_ for r_ in d["results"]}
+        # connected platforms -> published, with postUrl + mode
+        for p in ("facebook", "instagram", "google"):
+            assert by_platform[p]["status"] == "published"
+            assert by_platform[p]["postUrl"].startswith("https://")
+            assert "mode" in by_platform[p]
+        # not-connected -> skipped
+        for p in ("tiktok", "youtube"):
+            assert by_platform[p]["status"] == "skipped"
+            assert by_platform[p]["reason"] == "not connected"
+
+    def test_publish_all_respects_connection_toggle(self, s):
+        # authorize tiktok via callback
+        r = s.post(f"{API}/connections/oauth/callback",
+                   json={"platform": "tiktok", "code": "demo"}, timeout=15)
+        assert r.status_code == 200
+        # publish-all now includes tiktok as published
+        r = s.post(f"{API}/content/publish-all",
+                   json={"assetId": "clip-1", "caption": "hi"}, timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        by = {x["platform"]: x for x in d["results"]}
+        assert by["tiktok"]["status"] == "published"
+        assert by["tiktok"]["mode"] == "stubbed"
+        assert d["publishedCount"] == 4
+
+        # disconnect tiktok -> skipped again
+        r = s.put(f"{API}/connections",
+                  json={"platform": "tiktok", "connected": False}, timeout=15)
+        assert r.status_code == 200
+        r = s.post(f"{API}/content/publish-all", json={}, timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        by = {x["platform"]: x for x in d["results"]}
+        assert by["tiktok"]["status"] == "skipped"
+        assert by["tiktok"]["reason"] == "not connected"
+        assert d["publishedCount"] == 3
+
+    def test_publish_all_empty_body_ok(self, s):
+        r = s.post(f"{API}/content/publish-all", json={}, timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["totalPathways"] == 5
+        assert d["assetId"] is None
+        assert d["caption"] is None
+
+
+# ============================================================================
 # CORE ROUTES SMOKE — no 404s after refactor
 # ============================================================================
 class TestCoreRoutes:
