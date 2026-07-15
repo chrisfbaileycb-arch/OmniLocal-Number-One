@@ -48,6 +48,8 @@ Resend sending, Unified social OAuth. All realistic seeded data for a clickable 
 - 4 rotating games, weekly CSV segmentation, welcome-video automation, anti-spam trickle engine.
 - Social Media Connector OAuth handshake (start/callback, stubbed) + Connect flow UI.
 - Distribution pathways defined in Content Director backend + surfaced in UI.
+- Unified **Publish-All** (`POST /api/content/publish-all`) — one-cycle blast across all
+  authorized pathways with per-platform status feedback; skips unconnected surfaces.
 
 ## Backlog / Next Action Items
 - P1: Activate real Resend sending once `RESEND_API_KEY` provided (un-stub `send_via_resend`).
