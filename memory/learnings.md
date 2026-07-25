@@ -26,3 +26,13 @@ The forked pod arrived with widespread null/whitespace file corruption:
 - Frontend: index.js checks location.hash session_id synchronously → AuthCallback; AuthProvider +
   AuthGate in lib/AuthContext.js; axios withCredentials + 403 interceptor dispatches
   "omni-auth-locked" event to re-lock UI live.
+
+## 2026-07-25 — GitHub push failed: corrupt loose git objects
+- Symptom: push 500 "inflate: data stream error / loose object ... is corrupt". 58 loose objects
+  in .git/objects were null-byte corrupted (residue of the earlier pod corruption incident).
+- Fix: regenerated the 2 corrupt objects reachable from HEAD (empty blob e69de29 via
+  `printf '' | git hash-object -w --stdin`; frontend/jsconfig.json blob via `git hash-object -w`),
+  verified snapshot with `git archive HEAD`, then rebuilt history: orphan branch -> commit full
+  tree -> `git branch -M main` -> reflog expire -> rm remaining corrupt loose objects ->
+  `git gc --prune=now`. fsck clean; `git bundle create` used to prove pack/push path works.
+- .git backup saved at /tmp/git_backup_* (pre-repair). History is now a single clean commit.
