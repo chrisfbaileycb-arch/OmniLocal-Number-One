@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Gift, Copy, Check, PartyPopper, UtensilsCrossed, Sparkles, CalendarClock } from "lucide-react";
+import { Gift, Copy, Check, PartyPopper, UtensilsCrossed, Sparkles, CalendarClock, PauseCircle } from "lucide-react";
 import { getGames, spin, postScan } from "@/lib/api";
 
 function useSpace() {
@@ -40,9 +40,10 @@ export default function SpinPlay() {
   const [phone, setPhone] = useState("");
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    getGames().then((g) => { setGame(g.active); setFreqDays(g.playFrequencyDays || 7); }).catch(() => {});
+    getGames().then((g) => { setGame(g.active); setPaused(!g.active); setFreqDays(g.playFrequencyDays || 7); }).catch(() => {});
     if (!scanSent) {
       scanSent = true;
       postScan(space).catch(() => {});
@@ -91,7 +92,16 @@ export default function SpinPlay() {
       </div>
 
       <div className="card p-8 w-full max-w-sm text-center">
-        {phase === "signup" && (
+        {paused && (
+          <div data-testid="spin-paused" className="py-6">
+            <PauseCircle size={36} style={{ color: "var(--text-secondary)", margin: "0 auto" }} />
+            <h1 className="serif text-2xl mt-3">The game is taking a quick break</h1>
+            <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>
+              No prizes are live right now — scan again soon, the next round is always worth the trip.
+            </p>
+          </div>
+        )}
+        {!paused && phase === "signup" && (
           <>
             <div className="flex items-center justify-center gap-1.5 overline" style={{ color: "var(--primary)" }}>
               <Sparkles size={12} /> Everybody wins something
@@ -127,7 +137,7 @@ export default function SpinPlay() {
                 Join &amp; Spin
               </button>
               <p className="text-xs" data-testid="spin-privacy-note" style={{ color: "var(--text-secondary)" }}>
-                We only use your contact to send this restaurant's offers. Unsubscribe anytime with one click.
+                We only use your contact to send this business's offers. Unsubscribe anytime with one click.
               </p>
             </form>
           </>

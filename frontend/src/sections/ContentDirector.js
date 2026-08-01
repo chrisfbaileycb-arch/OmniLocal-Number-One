@@ -140,7 +140,7 @@ export default function ContentDirector() {
   return (
     <div className="p-6 md:p-12 max-w-[1200px]">
       <SectionTitle kicker="Module 01 · Content Director"
-        title="Film your restaurant once. Turn it into weeks of content."
+        title="Film your business once. Turn it into weeks of content."
         subtitle="The cook slinging a sub during the dinner rush beats any polished ad. We capture that authenticity, then multiply it — and tell you the honest truth about what to fix." />
 
       {/* Today's prompt */}

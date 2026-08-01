@@ -115,7 +115,7 @@ export default function Connections() {
         <Overline style={{ color: "var(--primary)" }}>Before your onboarding Zoom</Overline>
         <h3 className="serif text-2xl mt-1">Make the call efficient — set these up first</h3>
         <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>
-          Send new restaurants this prep list so call time isn't spent creating accounts. On the call, we click <b>Connect</b>,
+          Send new businesses this prep list so call time isn't spent creating accounts. On the call, we click <b>Connect</b>,
           authorize through the Unified API provider, and they're live in minutes.
         </p>
         <ul className="mt-4 space-y-2 text-sm">

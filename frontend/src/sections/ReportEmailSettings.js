@@ -63,7 +63,7 @@ export const ReportEmailSettings = () => {
         <input data-testid="report-email-recipient" value={recipient} type="email"
           onChange={(e) => setRecipient(e.target.value)}
           onBlur={() => recipient !== cfg.recipient && save({ recipient })}
-          placeholder="owner@yourrestaurant.com" className="rounded-lg border px-3 py-1.5 text-sm min-w-[220px]"
+          placeholder="owner@yourbusiness.com" className="rounded-lg border px-3 py-1.5 text-sm min-w-[220px]"
           style={{ borderColor: "var(--border)", background: "var(--surface)" }} />
         <select data-testid="report-email-tz" value={cfg.timezone} onChange={(e) => save({ timezone: e.target.value })}
           className="rounded-lg border px-2 py-1.5 text-xs"

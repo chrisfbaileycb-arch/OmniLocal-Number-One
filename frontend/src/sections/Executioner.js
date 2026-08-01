@@ -64,7 +64,7 @@ export default function Executioner() {
     setCoachBusy(s.displayName);
     try {
       const channels = Object.keys(s.perChannel || {}).join(", ") || "connected platforms";
-      const r = await coachTemplate(`${s.displayName} campaign for a restaurant, running on ${channels}`);
+      const r = await coachTemplate(`${s.displayName} campaign for a local business, running on ${channels}`);
       setCoachRes(r);
       toast.success("Build template ready", { description: "Scroll down — download it and build it yourself." });
     } catch (e) {

@@ -222,6 +222,13 @@ INDUSTRY_PACING = {
         "window": "Thu-Fri teasers before weekend tours",
         "rotation": "Facebook/Instagram one week -> yard-sign QR & postcard farming the next",
     },
+    "saas": {
+        "label": "Software / SaaS",
+        "advisor": "Focus bursts around demo days, launches, trade shows and niche community events - tease a giveaway or trial-upgrade game 2-3 days ahead, then go quiet and follow up with signups.",
+        "cadence": "2-3 day bursts around launches, events and demo pushes",
+        "window": "Tue-Thu business hours, when decision-makers are at their desks",
+        "rotation": "LinkedIn/Facebook one week -> event-flyer QR & partner newsletters the next",
+    },
 }
 
 DEFAULT_INDUSTRIES = [{"id": k, **v} for k, v in INDUSTRY_PACING.items()]
@@ -260,10 +267,11 @@ async def _governance_text() -> str:
 async def ai_generate_drafts(transcript: str, brand: dict) -> dict:
     if not EMERGENT_LLM_KEY:
         raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
-    gov = await _governance_text()
+    ind = await _current_industry()
+    gov = _governance_directive(ind)
     system = (
         f"You are the expert social media copywriter for {brand.get('name')}, a "
-        f"{brand.get('cuisine', 'local')} restaurant in {brand.get('city')}. "
+        f"{brand.get('cuisine', 'local')} {ind['label'].lower()} in {brand.get('city')}. "
         f"Write everything in this exact brand voice: {brand.get('voice')}. "
         f"Signature item: {brand.get('signatureItem')}. Menu highlights: {brand.get('menuHighlights')}. "
         f"Backstory: {brand.get('backstory')}. Never sound corporate, generic, or templated. "
@@ -1490,6 +1498,9 @@ MEMBER_SEG_TO_SPIN = {"coupon_only": "promo_pool", "loyal": "vip", "new": "new"}
 
 @api.post("/maximizer/spin")
 async def maximizer_spin(req: SpinReq, request: Request):
+    game = await resolve_active_game()
+    if not game:
+        raise HTTPException(status_code=423, detail="The game is taking a quick break — check back soon!")
     staff = await auth.get_session_user(request)
     email, phone = _norm_email(req.email), _norm_phone(req.phone)
     now = datetime.now(timezone.utc)
@@ -1537,7 +1548,6 @@ async def maximizer_spin(req: SpinReq, request: Request):
         await db.members.update_one({"memberKey": member["memberKey"]},
                                     {"$set": {"lastSpinAt": now.isoformat(), "updatedAt": now.isoformat()}})
     base = spin(is_new, seg, await state_get("prize_board", DEFAULT_PRIZE_BOARD))
-    game = await resolve_active_game()
     expiry_days = (await get_game_settings())["codeExpiryDays"]
     prefix = "HV-" if base["tier"] == "highValue" else "ST-"
     code = await _unique_code(prefix)
@@ -1555,7 +1565,7 @@ async def maximizer_spin(req: SpinReq, request: Request):
             "memberSegment": member["segment"] if member else None}
 
 
-DEFAULT_GAME_SETTINGS = {"playFrequencyDays": 7, "codeExpiryDays": 7}
+DEFAULT_GAME_SETTINGS = {"playFrequencyDays": 7, "codeExpiryDays": 7, "enabled": True}
 
 
 async def get_game_settings():
@@ -1564,8 +1574,13 @@ async def get_game_settings():
 
 
 async def resolve_active_game():
+    settings = await get_game_settings()
+    if not settings.get("enabled", True):
+        return None
     schedule = await state_get("game_schedule") or {}
     gid = schedule.get(_monday(0))
+    if gid == "none":
+        return None
     if gid:
         g = next((x for x in GAMES if x["id"] == gid), None)
         if g:
@@ -1581,6 +1596,7 @@ class GameWeekReq(BaseModel):
 class GameSettingsReq(BaseModel):
     playFrequencyDays: Optional[int] = None
     codeExpiryDays: Optional[int] = None
+    enabled: Optional[bool] = None
 
 
 @api.get("/maximizer/game-plan")
@@ -1594,7 +1610,7 @@ async def game_plan():
 
 @api.put("/maximizer/game-plan/week")
 async def set_game_week(req: GameWeekReq):
-    if req.gameId and not any(g["id"] == req.gameId for g in GAMES):
+    if req.gameId and req.gameId != "none" and not any(g["id"] == req.gameId for g in GAMES):
         raise HTTPException(status_code=400, detail="Unknown game")
     schedule = await state_get("game_schedule") or {}
     if req.gameId:
@@ -1608,6 +1624,8 @@ async def set_game_week(req: GameWeekReq):
 @api.put("/maximizer/game-settings")
 async def set_game_settings(req: GameSettingsReq):
     settings = await get_game_settings()
+    if req.enabled is not None:
+        settings["enabled"] = bool(req.enabled)
     if req.playFrequencyDays is not None:
         if req.playFrequencyDays not in (7, 14):
             raise HTTPException(status_code=400, detail="Play frequency must be 7 or 14 days")
@@ -1678,13 +1696,15 @@ async def qr_sheet_pdf(base: str = ""):
         pdf.set_auto_page_break(False)
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 17)
-        pdf.cell(0, 8, _latin(f"{brand.get('name', 'Your Restaurant')} - Scan-to-Play QR Sheet"),
+        pdf.cell(0, 8, _latin(f"{brand.get('name', 'Your Business')} - Scan-to-Play QR Sheet"),
                  new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 8.5)
         pdf.set_text_color(90, 90, 90)
+        game_line = (f"Current game: {game['name']}." if game
+                     else "Games are paused right now - scans still register while you get ready.")
         pdf.multi_cell(0, 4.2, _latin(
-            "These QR codes are UNIQUE to your restaurant - each opens YOUR play page and tags the scan "
-            f"with its placement, so Location Analytics shows which spot earns its keep. Current game: {game['name']}. "
+            "These QR codes are UNIQUE to your business - each opens YOUR play page and tags the scan "
+            f"with its placement, so Location Analytics shows which spot earns its keep. {game_line} "
             "Print this page at any print shop, on regular paper or sticker paper - cut along the dashed lines, "
             "then tape or laminate each code at its spot."), new_x="LMARGIN", new_y="NEXT")
         pdf.set_x(10)
@@ -1721,7 +1741,7 @@ async def qr_sheet_pdf(base: str = ""):
         pdf.set_text_color(60, 60, 60)
         pdf.set_font("Helvetica", "", 7.8)
         tips = [
-            "Every code opens YOUR play page - no other restaurant shares it.",
+            "Every code opens YOUR play page - no other business shares it.",
             "The label after 'space=' tells the system where it was scanned.",
             "Best spots go HOME with the customer - mailers, social posts, boxes & bags. Whole households scan to compare prizes, and every scan joins your list.",
             "Need a new spot? Type any label in the QR generator inside the Rewards module and print it.",
@@ -1743,6 +1763,8 @@ async def table_tent_pdf(spaceId: str = "Table Tent", base: str = ""):
     play_url = (f"{base.rstrip('/')}/spin?space={quote(spaceId)}" if base else f"/spin?space={quote(spaceId)}")
     brand = await state_get("brand_profile", DEFAULT_BRAND_PROFILE)
     game = await resolve_active_game()
+    board = await state_get("prize_board", DEFAULT_PRIZE_BOARD)
+    headline = (board.get("goodPrizes") or [{}])[0].get("label", "a top prize")
     tmp = tempfile.mkdtemp(prefix="tent_")
     qrpath = os.path.join(tmp, "qr.png")
     try:
@@ -1757,7 +1779,7 @@ async def table_tent_pdf(spaceId: str = "Table Tent", base: str = ""):
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 26)
         pdf.set_xy(0, 9)
-        pdf.cell(W, 10, brand.get("name", "Our Restaurant"), align="C")
+        pdf.cell(W, 10, brand.get("name", "Our Business"), align="C")
         pdf.set_font("Helvetica", "", 12)
         pdf.set_xy(0, 21)
         pdf.cell(W, 8, brand.get("city", ""), align="C")
@@ -1777,11 +1799,13 @@ async def table_tent_pdf(spaceId: str = "Table Tent", base: str = ""):
         pdf.set_text_color(39, 174, 96)
         pdf.set_font("Helvetica", "B", 20)
         pdf.set_xy(0, 186)
-        pdf.cell(W, 10, "Win up to a FREE SUB - instantly", align="C")
+        pdf.cell(W, 10, f"Win up to {headline} - instantly".encode("latin-1", "replace").decode("latin-1"), align="C")
         pdf.set_text_color(26, 26, 26)
         pdf.set_font("Helvetica", "", 13)
         pdf.set_xy(0, 199)
-        pdf.cell(W, 8, f"Play the {game['name']} - a reward every time you scan", align="C")
+        game_tag = (f"Play the {game['name']} - a reward every time you scan" if game
+                    else "A reward every time you scan - game starts soon")
+        pdf.cell(W, 8, game_tag, align="C")
         # divider
         pdf.set_draw_color(232, 230, 223)
         pdf.line(45, 216, W - 45, 216)
@@ -2373,7 +2397,7 @@ async def maximizer_games():
     settings = await get_game_settings()
     return {"games": GAMES, "active": await resolve_active_game(), "rotationDays": 30,
             "override": override, "playFrequencyDays": settings["playFrequencyDays"],
-            "codeExpiryDays": settings["codeExpiryDays"]}
+            "codeExpiryDays": settings["codeExpiryDays"], "enabled": settings.get("enabled", True)}
 
 
 @api.put("/maximizer/games/active")
@@ -2753,10 +2777,10 @@ async def _vision_frames(frames, frame_times):
     default = {"subjectFirstVisibleSeconds": 2.0, "subjectLit": "front", "subjectCutOff": False, "clutterScore": 0.3}
     if not frames:
         return default
-    system = "You are a brutally precise short-form video framing analyst for restaurant marketing. You reply ONLY with minified JSON."
+    system = "You are a brutally precise short-form video framing analyst for local-business marketing. You reply ONLY with minified JSON."
     prompt = (
         f"These {len(frames)} JPEG frames are sampled in chronological order at approximately "
-        f"{frame_times} seconds from the start of a vertical restaurant video. The SUBJECT is the "
+        f"{frame_times} seconds from the start of a vertical marketing video. The SUBJECT is the "
         "person talking or the food/product being shown. Analyze and return ONLY this JSON:\n"
         '{"subjectFirstVisibleSeconds": <number: the earliest listed time where a clear subject '
         'fills a meaningful part of the frame; if never clearly visible use the last time>, '
@@ -2918,26 +2942,26 @@ async def critic_video(video_id: str):
 # ONBOARDING VIDEO VAULT — film-once guided capture, feeds emails & drip
 # ===========================================================================
 VAULT_PROMPTS = [
-    {"id": "tour", "title": "Walk through your whole restaurant", "category": "tour",
-     "direction": "One take, phone in hand. Walk the path a guest takes, door to counter. Don't tidy up first — raw is the point."},
-    {"id": "menu_items", "title": "Film your most popular menu items", "category": "menu",
-     "direction": "Get close. Steam, the cheese pull, the ladle pour. 15–30 seconds per dish. No narration needed."},
-    {"id": "kitchen", "title": "Your cooks working the kitchen", "category": "kitchen",
-     "direction": "The line during prep or a rush. Real motion, real sound. This is proof, not production."},
-    {"id": "dining_room", "title": "Your dining room", "category": "tour",
+    {"id": "tour", "title": "Walk through your whole place", "category": "tour",
+     "direction": "One take, phone in hand. Walk the path a customer takes, door to counter. Don't tidy up first — raw is the point."},
+    {"id": "menu_items", "title": "Your best sellers, up close", "category": "menu",
+     "direction": "Get close. Texture, motion, detail — the thing people come to you for. 15–30 seconds each. No narration needed."},
+    {"id": "kitchen", "title": "Your team at work behind the scenes", "category": "kitchen",
+     "direction": "The crew mid-shift, hands moving. Real motion, real sound. This is proof, not production."},
+    {"id": "dining_room", "title": "Where your customers experience it", "category": "tour",
      "direction": "A slow pan when there's a little life in the room. Imperfect lighting is fine — it reads as real."},
-    {"id": "exterior", "title": "The outside of your restaurant", "category": "tour",
+    {"id": "exterior", "title": "The outside of your business", "category": "tour",
      "direction": "Walk up to the front door like a first-timer. Include the sign and the street."},
-    {"id": "owner_intro", "title": "\u201cHello, welcome to my restaurant\u201d — your story", "category": "intro",
-     "direction": "Long take. Who you are, why you opened, what you'd order tonight. Talk to one regular, not a camera."},
+    {"id": "owner_intro", "title": "\u201cHello, welcome\u201d — your story", "category": "intro",
+     "direction": "Long take. Who you are, why you started, what you'd recommend first. Talk to one regular, not a camera."},
     {"id": "birthday", "title": "\u201cHappy birthday from all of us\u201d", "category": "greeting",
      "direction": "Ten seconds, big smile, maybe the crew behind you. This goes out on members' birthdays forever."},
     {"id": "holiday", "title": "\u201cMerry Christmas / happy holidays\u201d", "category": "greeting",
      "direction": "One warm holiday wish. Film it once, it works every year."},
     {"id": "rewards_thanks", "title": "\u201cThank you for joining our rewards team\u201d", "category": "rewards",
      "direction": "Thank them for supporting a small business — it means a lot, so say it like it does. This is your welcome email."},
-    {"id": "new_dish", "title": "A dish or special you're pushing right now", "category": "campaign",
-     "direction": "The thing you want everyone ordering this month. Show it, name it, done."},
+    {"id": "new_dish", "title": "The product or offer you're pushing right now", "category": "campaign",
+     "direction": "The thing you want everyone buying this month. Show it, name it, done."},
 ]
 
 
@@ -3157,10 +3181,11 @@ async def industry_delete(iid: str, request: Request):
 async def ai_build_template(topic: str, brand: dict) -> dict:
     if not EMERGENT_LLM_KEY:
         raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
-    gov = await _governance_text()
+    ind = await _current_industry()
+    gov = _governance_directive(ind)
     system = (
         f"You are the marketing coach for {brand.get('name')}, a {brand.get('cuisine', 'local')} "
-        f"restaurant in {brand.get('city')}. Brand voice: {brand.get('voice')}. "
+        f"{ind['label'].lower()} in {brand.get('city')}. Brand voice: {brand.get('voice')}. "
         f"Signature item: {brand.get('signatureItem')}. "
         "You NEVER make content for the owner — you hand them a tight, practical build template "
         "they execute themselves on their own phone. Raw beats polished: too-polished content reads "
@@ -3174,7 +3199,7 @@ async def ai_build_template(topic: str, brand: dict) -> dict:
         '{"title":"...","whyItWorks":"one short paragraph",'
         '"keyElements":["4-6 short must-have elements"],'
         '"offerTemplate":["3-4 fill-in-the-blank lines using ___ blanks, e.g. This week only: ___ for $___, ends ___"],'
-        '"shotList":[{"shot":"what to film","where":"where in the restaurant","tip":"one raw-phone-video tip"}],'
+        '"shotList":[{"shot":"what to film","where":"where at your business","tip":"one raw-phone-video tip"}],'
         '"whereItGoes":["3-4 lines: platform/surface + when to post it"],'
         '"successCheck":["2-3 measurable ways to know it worked"]}\n'
         "shotList must have exactly 3-4 items."
@@ -3193,7 +3218,7 @@ async def ai_plan_check(template: dict, transcript: str, report: dict) -> dict:
     if not EMERGENT_LLM_KEY:
         raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
     system = (
-        "You are a no-nonsense but encouraging content coach for a restaurant. The owner filmed a video "
+        "You are a no-nonsense but encouraging content coach for a local business. The owner filmed a video "
         "for a specific campaign plan. Compare what they made against the plan. Be SHORT — 'that content "
         "isn't matched up to what we recommended, but we can make this work' energy. Recommend edits or "
         "re-films, never offer to make it for them. "

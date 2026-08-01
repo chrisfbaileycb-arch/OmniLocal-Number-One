@@ -10,7 +10,7 @@ _orig_init = requests.Session.__init__
 
 def _patched_init(self, *args, **kwargs):
     _orig_init(self, *args, **kwargs)
-    retry = Retry(total=6, backoff_factor=0.5, status_forcelist=[502, 503, 504],
+    retry = Retry(total=6, backoff_factor=0.5, status_forcelist=[423, 502, 503, 504],
                   allowed_methods=None, raise_on_status=False)
     adapter = HTTPAdapter(max_retries=retry)
     self.mount("http://", adapter)

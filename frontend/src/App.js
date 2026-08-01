@@ -91,7 +91,7 @@ function App() {
 
           {brand && (
             <div className="p-4 m-3 rounded-lg" style={{ background: "var(--surface-alt)" }}>
-              <div className="overline" style={{ fontSize: "0.55rem" }}>Active Restaurant</div>
+              <div className="overline" style={{ fontSize: "0.55rem" }}>Active Business</div>
               <div className="serif text-lg" style={{ fontWeight: 600 }}>{brand.name}</div>
               <div className="text-xs" style={{ color: "var(--text-secondary)" }}>{brand.city} · {brand.signatureItem}</div>
             </div>

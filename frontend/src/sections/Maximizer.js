@@ -125,6 +125,7 @@ export default function Maximizer() {
   const changeRules = async (body) => {
     const r = await setGameSettings(body);
     setPlan((p) => ({ ...p, settings: r.settings }));
+    getGames().then(setGames).catch(() => {});
     toast.success("Game rules updated");
   };
 
@@ -141,13 +142,13 @@ export default function Maximizer() {
       {/* Four rotating games */}
       <div className="card p-6 md:p-8" data-testid="games-module">
         <div className="flex items-center gap-2"><Gamepad2 size={18} color="var(--primary)" /><Overline>Game Planner · a different game every week</Overline></div>
-        <h3 className="serif text-2xl mt-1">Active game: {games.active.name}</h3>
+        <h3 className="serif text-2xl mt-1" data-testid="active-game-title">Active game: {games.active ? games.active.name : "Paused"}</h3>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-          Plan the next four weeks below — the weekly schedule wins, a pinned game is the fallback, and auto-rotation covers the rest.
+          Plan the next four weeks below — the weekly schedule wins, a pinned game is the fallback, and auto-rotation covers the rest. Set a week to "No game" to rest it, or pause everything with the switch below.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           {games.games.map((g) => {
-            const on = games.active.id === g.id;
+            const on = games.active?.id === g.id;
             return (
               <button key={g.id} onClick={() => chooseGame(g.id)} data-testid={`game-${g.id}`}
                 className="text-left p-4 rounded-lg lift"
@@ -172,12 +173,20 @@ export default function Maximizer() {
                     className="w-full mt-1 rounded-lg border px-2 py-2 text-xs"
                     style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                     <option value="">Auto / pinned</option>
+                    <option value="none">No game — rest week</option>
                     {plan.games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-5 mt-4">
+              <label className="text-xs flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+                <input type="checkbox" data-testid="games-enabled-toggle" checked={plan.settings.enabled !== false}
+                  onChange={(e) => changeRules({ enabled: e.target.checked })} />
+                {plan.settings.enabled === false
+                  ? <b style={{ color: "#B03A2E" }} data-testid="games-paused-note">Games PAUSED — play page shows "check back soon"</b>
+                  : <span>Games running</span>}
+              </label>
               <label className="text-xs flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
                 Play limit
                 <select data-testid="play-frequency-select" value={plan.settings.playFrequencyDays}
@@ -242,7 +251,7 @@ export default function Maximizer() {
               <Printer size={13} className="inline mr-1" /> Print all-spot QR sheet (PDF)
             </a>
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              One page, all 7 spots — print it anywhere. Every code is unique to your restaurant.
+              One page, all 7 spots — print it anywhere. Every code is unique to your business.
             </span>
           </div>
           {qr && (
