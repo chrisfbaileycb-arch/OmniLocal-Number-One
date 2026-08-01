@@ -224,7 +224,7 @@ export default function Maximizer() {
           <div className="flex items-center gap-2"><QrCode size={18} color="var(--primary)" /><Overline>In-Store QR · scan to play</Overline></div>
           <h3 className="serif text-2xl mt-1">Send it home with them</h3>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Customers scan → play {games.active.name} on their phone → win a real, tracked coupon code.
+            Customers scan → play {games.active?.name || "the active game"} on their phone → win a real, tracked coupon code.
             The best spots go home — pizza boxes, bags, mailer ads, social posts — whole households scan
             to compare prizes, and every scan joins your list.
           </p>
@@ -312,7 +312,7 @@ export default function Maximizer() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         {/* Scan to Spin */}
         <div className="card p-6 md:p-8" data-testid="scan-to-spin">
-          <div className="flex items-center gap-2"><QrCode size={18} color="var(--primary)" /><Overline>{games.active.name}</Overline></div>
+          <div className="flex items-center gap-2"><QrCode size={18} color="var(--primary)" /><Overline>{games.active?.name || "Games paused"}</Overline></div>
           <h3 className="serif text-2xl mt-1">Segment-aware rewards</h3>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
             New & quality guests win the big reward to entice them in — couponers get something small to protect your margin.

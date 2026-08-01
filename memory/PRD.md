@@ -322,3 +322,26 @@ Resend sending, Unified social OAuth. All realistic seeded data for a clickable 
   Owner records → YouTube → paste links into Strategy panel video slots.
 - GOTCHA fixed: parallel search_replace edits on StrategyPanel.js collided (stray lines +
   dropped import) → syntax error + Settings2 ReferenceError; repaired, verified.
+
+## 2026-08-01 — Games Fully Optional + Multi-Industry Generalization (DONE, iter_25 + 177/177)
+- **User directive:** app must work standalone WITHOUT the wheel (protect the "bump"), games
+  toggle on/off; user will market OmniLocal with OmniLocal (dogfooding as a SaaS).
+- **Pause toggle**: game_settings.enabled (default true); PUT /api/maximizer/game-settings
+  {enabled}; resolve_active_game() → None when off. Public spin blocked with 423; /spin shows
+  'taking a quick break' screen (spin-paused); PDFs (qr-sheet, table-tent) render paused-safe.
+- **Rest weeks**: game-plan week gameId "none" → no game that week (weekly 'none' beats
+  rotation). UI: 'No game — rest week' option in all 4 week selects; 'Games running' checkbox
+  (games-enabled-toggle) + red PAUSED note; active-game-title shows 'Paused'.
+- **SaaS vertical**: 'Software / SaaS' added to INDUSTRY_PACING + seeded in DB (7 verticals).
+- **De-restauranted**: AI prompts now industry-aware (copywriter + coach use
+  _current_industry() label; plan-check/vision generic); vault prompts, QR/PDF copy,
+  sidebar 'Active Business', spin privacy note, placeholders all generalized. Table tent
+  headline now pulls prize board slot 1 (was hardcoded FREE SUB).
+- **New games**: 4 built-in mechanics only (wheel/scratch/vault/slots); new mechanics = dev
+  work (backlog); prizes fully re-themeable via Prize Board.
+- Tests: tests/test_game_toggle.py (4); conftest retries now include 423 (rides out pause
+  windows under xdist); raw no-retry session used to assert 423. Suite: 177/177.
+- GOTCHAS: (1) parallel same-file edits silently REVERTED 3 'successful' edits + duplicated
+  the file tail (IndentationError) — always audit server.py after big parallel batches;
+  (2) iter_25 found bare games.active.name at Maximizer.js:227/315 → crash-to-ErrorBoundary
+  when paused; guarded, self-verified per repro.
