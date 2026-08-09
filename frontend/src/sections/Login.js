@@ -104,6 +104,12 @@ export default function Login() {
             </div>
           ))}
         </div>
+
+        <p className="text-xs mt-5 text-center">
+          <a href="/pricing" data-testid="login-pricing-link" style={{ color: "var(--primary)", fontWeight: 600 }}>
+            New here? See plans &amp; pricing →
+          </a>
+        </p>
       </div>
     </div>
   );

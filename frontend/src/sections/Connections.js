@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Facebook, Instagram, MapPin, Music2, Youtube, Check, Info, Video, Link2, ShieldCheck } from "lucide-react";
-import { getConnections, setConnection, oauthStart, oauthCallback } from "@/lib/api";
+import { getConnections, setConnection, oauthStart, oauthCallback, gbpStart, gbpStatus, gbpLocations, gbpSetLocation, gbpDisconnect } from "@/lib/api";
 import { SectionTitle, Overline } from "@/components/ui-bits";
 
 const ICONS = {
@@ -21,12 +21,27 @@ export default function Connections() {
   const [busy, setBusy] = useState(null);
 
   const load = () => getConnections().then(setData).catch(() => {});
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("google") === "connected") {
+      toast.success("Google Business Profile connected!", { description: "Pick your publish location below." });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   // OAuth "Connect" handshake via the Unified API provider (stubbed end-to-end).
   const connect = async (platform, label) => {
     setBusy(platform);
     try {
+      if (platform === "google") {
+        const g = await gbpStart();
+        if (g.authorization_url) {
+          window.location.assign(g.authorization_url);
+          return;
+        }
+        toast.message("Google publishing is in demo mode", { description: g.message });
+      }
       const start = await oauthStart(platform);
       toast.message(`Authorizing ${label}…`, {
         description: `Redirecting through ${start.provider}${start.live ? "" : " (demo handshake)"}`,

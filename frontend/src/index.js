@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 import SpinPlay from "@/sections/SpinPlay";
+import Pricing from "@/sections/Pricing";
+import PaymentResult from "@/sections/PaymentResult";
 import AuthCallback from "@/sections/AuthCallback";
 import { AuthProvider, AuthGate } from "@/lib/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -25,6 +27,9 @@ function Root() {
   return (
     <Routes>
       <Route path="/spin" element={<SpinPlay />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/payment/success" element={<PaymentResult kind="success" />} />
+      <Route path="/payment/cancel" element={<PaymentResult kind="cancel" />} />
       <Route path="*" element={<AuthGate><App /></AuthGate>} />
     </Routes>
   );

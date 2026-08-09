@@ -127,6 +127,17 @@ export const putStrategy = (body) => client.put("/content/strategy", body).then(
 export const addIndustry = (body) => client.post("/content/industries", body).then((r) => r.data);
 export const updateIndustry = (iid, body) => client.put(`/content/industries/${iid}`, body).then((r) => r.data);
 export const deleteIndustry = (iid) => client.delete(`/content/industries/${iid}`).then((r) => r.data);
+
+export const createCheckout = (lookupKey) =>
+  client.post("/payments/checkout", { lookup_key: lookupKey, origin_url: window.location.origin }).then((r) => r.data);
+export const paymentStatus = (sessionId) => client.get(`/payments/status/${sessionId}`).then((r) => r.data);
+
+export const gbpStart = () => client.get("/google-business/start").then((r) => r.data);
+export const gbpStatus = () => client.get("/google-business/status").then((r) => r.data);
+export const gbpLocations = () => client.get("/google-business/locations").then((r) => r.data);
+export const gbpSetLocation = (name, title) =>
+  client.put("/google-business/location", { name, title }).then((r) => r.data);
+export const gbpDisconnect = () => client.delete("/google-business/connection").then((r) => r.data);
 export const getPrizeBoard = () => client.get("/maximizer/prize-board").then((r) => r.data);
 export const setPrizeBoard = (body) => client.put("/maximizer/prize-board", body).then((r) => r.data);
 export const getSpinQr = (spaceId, base) =>

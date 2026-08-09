@@ -62,6 +62,8 @@ mongo = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = mongo[os.environ["DB_NAME"]]
 
 import auth  # noqa: E402
+import payments  # noqa: E402
+import google_business  # noqa: E402
 auth.init(db)
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
@@ -1138,6 +1140,15 @@ async def _do_publish_all(payload):
         platform = path["platform"]
         base = {"platform": platform, "label": path["label"], "surface": path["surface"]}
         if connections.get(platform, False):
+            if platform == "google" and google_business.is_live():
+                res = await google_business.publish_localpost(payload.get("caption") or "New from our business")
+                if res.get("ok"):
+                    published += 1
+                    results.append({**base, "status": "published", "mode": "live",
+                                    "postUrl": res.get("postUrl")})
+                else:
+                    results.append({**base, "status": "error", "reason": str(res.get("error"))[:160]})
+                continue
             published += 1
             mode = tokens.get(platform, {}).get("mode", "manual")
             results.append({**base, "status": "published", "mode": mode,
@@ -3403,6 +3414,10 @@ async def _ensure_indexes():
         await db.login_attempts.create_index("updatedAt", expireAfterSeconds=1800)
     except Exception:
         logger.exception("TTL index creation failed for login_attempts")
+    try:
+        await db.google_oauth_states.create_index("expiresAt", expireAfterSeconds=0)
+    except Exception:
+        logger.exception("TTL index creation failed for google_oauth_states")
 
 
 @app.on_event("startup")
@@ -3438,10 +3453,14 @@ async def seed_state():
 
 
 auth.EXECUTORS.update({"publish_all": _do_publish_all, "send_welcome": _do_send_welcome})
+payments.init(db)
+google_business.init(db, state_get, state_set)
 app.include_router(auth.router)
 app.include_router(auth.team_router)
 app.include_router(auth.approvals_router)
 app.include_router(api)
+app.include_router(payments.router)
+app.include_router(google_business.router)
 app.middleware("http")(auth.auth_middleware)
 app.add_middleware(
     CORSMiddleware, allow_credentials=True,

@@ -28,8 +28,9 @@ team_router = APIRouter(prefix="/api/team")
 approvals_router = APIRouter(prefix="/api/approvals")
 
 OPEN_PATHS = {"/api", "/api/", "/api/auth/session", "/api/auth/login", "/api/maximizer/spin",
-              "/api/maximizer/games", "/api/maximizer/scan"}
-OPEN_PREFIXES = ("/api/vault/video/",)
+              "/api/maximizer/games", "/api/maximizer/scan",
+              "/api/payments/checkout", "/api/stripe/webhook", "/api/google-business/callback"}
+OPEN_PREFIXES = ("/api/vault/video/", "/api/payments/status/")
 SESSION_ONLY_PATHS = {"/api/auth/me", "/api/auth/logout", "/api/auth/activate"}
 
 
