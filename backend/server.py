@@ -7,8 +7,9 @@ Phase 0 (Persistence): all application state lives in MongoDB (motor, async).
   Startup seeds any missing key so demos work, but real data now survives restarts.
 
 Phase 1A (Real AI): the Content Director copywriter is a real Claude Sonnet 4.6 call
-  (via emergentintegrations + Emergent LLM key), grounded in a stored Brand Brain.
-  Every generation is logged to the `ai_generations` collection. No template fallback.
+  (official Anthropic/OpenAI SDKs via ai.py, keyed by ANTHROPIC_API_KEY /
+  OPENAI_API_KEY), grounded in a stored Brand Brain. Every generation is logged
+  to the `ai_generations` collection. No template fallback.
 
 Still stubbed (future phases): video critic metrics, ad-platform posting, Resend
   sending, Unified social OAuth, POS transaction feed (executioner still uses seeded
@@ -20,8 +21,6 @@ from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-from emergentintegrations.llm.openai import OpenAISpeechToText
 import os
 import re
 import json
@@ -61,13 +60,14 @@ logger = logging.getLogger("omnilocal")
 mongo = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = mongo[os.environ["DB_NAME"]]
 
+import ai  # noqa: E402
 import auth  # noqa: E402
 import payments  # noqa: E402
 import google_business  # noqa: E402
 auth.init(db)
 
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
-AI_MODEL = ("anthropic", "claude-sonnet-4-6")
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")  # object storage only — replaced in the storage migration
+AI_MODEL = ("anthropic", os.environ.get("AI_MODEL", "claude-sonnet-4-6"))
 
 
 async def state_get(key, default=None):
@@ -267,8 +267,6 @@ async def _governance_text() -> str:
 
 
 async def ai_generate_drafts(transcript: str, brand: dict) -> dict:
-    if not EMERGENT_LLM_KEY:
-        raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
     ind = await _current_industry()
     gov = _governance_directive(ind)
     system = (
@@ -290,10 +288,8 @@ async def ai_generate_drafts(transcript: str, brand: dict) -> dict:
         f"mention @{brand.get('igHandle')}.\n\n"
         'Return ONLY JSON in this exact shape: {"gbp":"...","facebook":"...","instagram":"..."}'
     )
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()),
-                   system_message=system).with_model(*AI_MODEL)
-    resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=45)
-    text = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+    text = await asyncio.wait_for(
+        ai.claude_complete(system=system, prompt=prompt, model=AI_MODEL[1]), timeout=45)
     return _parse_drafts(text)
 
 
@@ -2777,11 +2773,7 @@ def _ffmpeg_extract(video_bytes, ext):
 async def _transcribe(wav_path):
     if not wav_path:
         return ""
-    stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-    with open(wav_path, "rb") as f:
-        resp = await asyncio.wait_for(
-            stt.transcribe(file=f, model="whisper-1", response_format="json", language="en"), timeout=90)
-    return (getattr(resp, "text", "") or "").strip()
+    return await asyncio.wait_for(ai.transcribe_wav(wav_path), timeout=90)
 
 
 async def _vision_frames(frames, frame_times):
@@ -2800,11 +2792,8 @@ async def _vision_frames(frames, frame_times):
         '"subjectCutOff": true|false (is the subject clipped awkwardly by a frame edge), '
         '"clutterScore": <0..1 how visually busy/distracting the background is>}'
     )
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()),
-                   system_message=system).with_model("openai", "gpt-4o")
-    msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=b) for b in frames])
-    resp = await asyncio.wait_for(chat.send_message(msg), timeout=75)
-    text = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+    text = await asyncio.wait_for(
+        ai.openai_vision_complete(system=system, prompt=prompt, images_base64=frames), timeout=75)
     try:
         t = text.strip()
         if t.startswith("```"):
@@ -3190,8 +3179,6 @@ async def industry_delete(iid: str, request: Request):
 # THE COACH — build templates on demand + accountability plan-checks
 # ===========================================================================
 async def ai_build_template(topic: str, brand: dict) -> dict:
-    if not EMERGENT_LLM_KEY:
-        raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
     ind = await _current_industry()
     gov = _governance_directive(ind)
     system = (
@@ -3215,10 +3202,8 @@ async def ai_build_template(topic: str, brand: dict) -> dict:
         '"successCheck":["2-3 measurable ways to know it worked"]}\n'
         "shotList must have exactly 3-4 items."
     )
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()),
-                   system_message=system).with_model(*AI_MODEL)
-    resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=60)
-    text = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+    text = await asyncio.wait_for(
+        ai.claude_complete(system=system, prompt=prompt, model=AI_MODEL[1]), timeout=60)
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise RuntimeError("Coach returned an unreadable template.")
@@ -3226,8 +3211,6 @@ async def ai_build_template(topic: str, brand: dict) -> dict:
 
 
 async def ai_plan_check(template: dict, transcript: str, report: dict) -> dict:
-    if not EMERGENT_LLM_KEY:
-        raise RuntimeError("EMERGENT_LLM_KEY is not configured.")
     system = (
         "You are a no-nonsense but encouraging content coach for a local business. The owner filmed a video "
         "for a specific campaign plan. Compare what they made against the plan. Be SHORT — 'that content "
@@ -3244,10 +3227,8 @@ async def ai_plan_check(template: dict, transcript: str, report: dict) -> dict:
         "\"matched\":[\"1-2 short things that match the plan\"],"
         "\"fix\":[\"2-3 short, specific edit or re-film actions with where/how\"]}"
     )
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()),
-                   system_message=system).with_model(*AI_MODEL)
-    resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=45)
-    text = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+    text = await asyncio.wait_for(
+        ai.claude_complete(system=system, prompt=prompt, model=AI_MODEL[1]), timeout=45)
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise RuntimeError("Plan check returned unreadable output.")
